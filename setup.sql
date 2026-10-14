@@ -7,7 +7,7 @@
 
 create or replace function public.is_admin() returns boolean
 language sql stable as $$
-  select lower(coalesce(auth.jwt() ->> 'email', '')) = lower('cotitoyanezleon@gmail.com')
+  select lower(coalesce(auth.jwt() ->> 'email', '')) = lower('TU_CORREO@gmail.com')
 $$;
 
 -- ---------- Tablas ----------
