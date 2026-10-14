@@ -23,6 +23,26 @@
     tickets: [
       { id: uid(), event_date: at(6), rival: 'Ashford Rangers', competition: 'EFL League Two', venue: 'Harbour Lane', price_adult: 18, price_junior: 6, price_senior: 12, available: 3900, away_allocation: 600, on_sale: true, created_at: at(-8) }
     ],
+    sponsors: [
+      { id: uid(), name: 'Umbro', role: 'Patrocinador técnico oficial', tier: 'principal', sort_order: 10, logo_url: null, website_url: null, created_at: at(-300),
+        description: 'Marca deportiva que fabrica las camisetas local, visitante y alternativa, además de la ropa de entrenamiento y parte del equipamiento del club.' },
+      { id: uid(), name: 'Shoreline Building Supplies', role: 'Patrocinador de la tribuna principal', tier: 'oficial', sort_order: 20, logo_url: null, website_url: null, created_at: at(-299),
+        description: 'Empresa local de materiales de construcción. Su nombre aparece en la entrada de la tribuna y en la señalización interior.' },
+      { id: uid(), name: 'South Coast Energy', role: 'Patrocinador del Michael Callahan Training Centre', tier: 'oficial', sort_order: 30, logo_url: null, website_url: null, created_at: at(-298),
+        description: 'Empresa regional de instalaciones eléctricas y eficiencia energética. Ayuda a financiar el mantenimiento de los campos del primer equipo.' },
+      { id: uid(), name: 'Worthing Family Dental', role: 'Patrocinador del New Gen Training Centre', tier: 'oficial', sort_order: 40, logo_url: null, website_url: null, created_at: at(-297),
+        description: 'Clínica dental local que apoya el fútbol juvenil y las iniciativas comunitarias. Su marca aparece en la entrada de la academia.' },
+      { id: uid(), name: 'Sussex Digital Systems', role: 'Patrocinador del marcador electrónico', tier: 'oficial', sort_order: 50, logo_url: null, website_url: null, created_at: at(-296),
+        description: 'Pequeña compañía tecnológica que aporta apoyo económico y asistencia técnica para los sistemas digitales del estadio.' },
+      { id: uid(), name: 'Sussex Coast Travel', role: 'Patrocinador de transporte y desplazamientos', tier: 'oficial', sort_order: 60, logo_url: null, website_url: null, created_at: at(-295),
+        description: 'Empresa de transporte que apoya los viajes del equipo y obtiene visibilidad en el estadio.' },
+      { id: uid(), name: 'Coastline Electrical Services', role: 'Patrocinador de los banquillos', tier: 'colaborador', sort_order: 70, logo_url: null, website_url: null, created_at: at(-294),
+        description: 'Empresa eléctrica de la zona que financia la señalización de los banquillos y aparece en las publicaciones oficiales del club.' },
+      { id: uid(), name: 'The Toad in the Hole', role: 'Socio oficial de hostelería y comunidad', tier: 'colaborador', sort_order: 80, logo_url: null, website_url: null, created_at: at(-293),
+        description: 'El pub donde nació el club. Colabora en reuniones de socios, encuentros con jugadores y actividades para la hinchada.' },
+      { id: uid(), name: 'Seafront Coffee Company', role: 'Patrocinador de hospitalidad y días de partido', tier: 'colaborador', sort_order: 90, logo_url: null, website_url: null, created_at: at(-292),
+        description: 'Cafetería local que colabora en la oferta de bebidas y productos para los aficionados en las zonas de hospitalidad.' }
+    ],
     news: [
       { id: uid(), title: 'El Worthing Mariners asciende a la EFL League Two', kind: 'noticia', author: 'Prensa del club',
         summary: 'Diez años después de nacer en The Toad in the Hole, el club alcanza el fútbol profesional.',

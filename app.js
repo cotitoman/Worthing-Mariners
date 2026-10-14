@@ -20,6 +20,7 @@
   const toast = (msg, err) => { const t = $('#toast'); t.textContent = msg; t.className = 'show' + (err ? ' error' : ''); clearTimeout(toast._t); toast._t = setTimeout(() => t.className = '', 3800); };
   const adm = (html) => isAdmin ? `<span class="adm">${html}</span>` : '';
   const crestImg = (url, name, cls = '') => url ? `<img class="crest ${cls}" src="${esc(url)}" alt="Escudo ${esc(name)}" loading="lazy">` : `<span class="crest ph ${cls}" aria-hidden="true">${esc(initials(name))}</span>`;
+  const safeUrl = (u) => /^https?:\/\//i.test(String(u || '')) ? u : '';
   const MARINERS_CREST = `<img class="crest" src="escudo.png" alt="Escudo Worthing Mariners">`;
 
   const POSITIONS = ['PT', 'LD', 'LI', 'DFC', 'MCD', 'MC', 'MCO', 'MD', 'MI', 'ED', 'EI', 'SD', 'DC'];
@@ -141,6 +142,7 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
     const bar = $('#adminbar');
     let html = '';
     if (isAdmin) html = `<div class="ab"><div class="wrap"><span>🛠 <b>Modo administrador:</b> usa los botones punteados para editar el sitio.${DB.REMOTE ? '' : ' (Demo: se guarda solo en este navegador)'}</span><button data-act="logout">Cerrar sesión</button></div></div>`;
+    else if (DB.wantsRemote && !DB.REMOTE) html = `<div class="ab"><div class="wrap"><span>⚠ No se pudo cargar Supabase (la librería no descargó). Desactiva bloqueadores de anuncios/scripts para este sitio y recarga con Ctrl+F5.</span></div></div>`;
     else if (!DB.REMOTE) html = `<div class="ab"><div class="wrap"><span>Modo demo: los cambios se guardan solo en tu navegador. Configura Supabase (ver README) para publicarla de verdad.</span></div></div>`;
     bar.className = !DB.REMOTE ? 'demo' : '';
     bar.innerHTML = html;
@@ -208,7 +210,7 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
   const pages = {};
 
   pages.home = async () => {
-    const [matches, news] = await Promise.all([DB.list('matches', 'match_date', true), DB.list('news', 'created_at', false)]);
+    const [matches, news, sponsors] = await Promise.all([DB.list('matches', 'match_date', true), DB.list('news', 'created_at', false), DB.list('sponsors', 'sort_order', true).catch(() => [])]);
     const upcoming = matches.filter(m => !m.played && new Date(m.match_date) >= new Date(Date.now() - 3 * 3600e3));
     const played = matches.filter(m => m.played).slice(-1);
     const strip = [upcoming[0], played[0]].filter(Boolean);
@@ -226,6 +228,10 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
       <div class="sec-head"><h2 class="display">Últimas noticias</h2><a class="btn dark sm" href="#/noticias">Ver todas</a></div>
       ${feature.length ? `<div class="news-feature">${feature.map(newsCard).join('')}</div>` : `<div class="empty">Todavía no hay noticias.</div>`}
     </div></section>
+    ${sponsors.length ? `<section class="section tight"><div class="wrap">
+      <div class="sec-head"><h2 class="display">Patrocinadores</h2><a class="btn dark sm" href="#/patrocinadores">Conócelos</a></div>
+      <div class="sponsor-strip">${sponsors.slice(0, 8).map(s => `<a class="sp-chip" href="#/patrocinadores" title="${esc(s.name)}">${s.logo_url ? `<img src="${esc(s.logo_url)}" alt="${esc(s.name)}" loading="lazy">` : `<span>${esc(s.name)}</span>`}</a>`).join('')}</div>
+    </div></section>` : ''}
     <section class="facts"><div class="wrap">
       <div class="fact"><b>2016</b><span>Año de fundación</span></div>
       <div class="fact"><b>4.850</b><span>Aforo de Harbour Lane</span></div>
@@ -312,6 +318,30 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
       </div></section>`;
   };
 
+  pages.patrocinadores = async () => {
+    let all;
+    try { all = await DB.list('sponsors', 'sort_order', true); }
+    catch (e) {
+      return pageHead('Patrocinadores', '') + `<div class="wrap section"><div class="empty">Esta sección aún no está activada en la base de datos.<br><small>Falta ejecutar <b>sponsors.sql</b> en Supabase (SQL Editor).</small></div></div>`;
+    }
+    const TIERS = [['principal', 'Patrocinador técnico oficial'], ['oficial', 'Patrocinadores oficiales'], ['colaborador', 'Colaboradores']];
+    const card = (s) => {
+      const url = safeUrl(s.website_url);
+      return `<article class="sponsor">
+        <div class="logo">${s.logo_url ? `<img src="${esc(s.logo_url)}" alt="Logo de ${esc(s.name)}" loading="lazy">` : `<span class="mono" aria-hidden="true">${esc(initials(s.name))}</span>`}</div>
+        <div class="in">${s.role ? `<span class="role">${esc(s.role)}</span>` : ''}
+          <h3 class="display">${esc(s.name)}</h3>
+          <p>${esc(s.description || '')}</p>
+          ${url ? `<a class="more" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Visitar su web →</a>` : ''}
+          ${adm(`<button data-act="edit-sponsor" data-id="${s.id}">Editar</button><button class="del" data-act="del-sponsor" data-id="${s.id}">Borrar</button>`)}
+        </div></article>`;
+    };
+    const known = TIERS.map(t => t[0]);
+    const groups = TIERS.map(([k, label]) => [label, all.filter(s => (known.includes(s.tier) ? s.tier : 'colaborador') === k)]);
+    return pageHead('Patrocinadores', 'Las empresas que apoyan al Worthing Mariners y a su comunidad. Gracias por creer en un club de su gente.', isAdmin ? `<button class="adm-add" data-act="add-sponsor">+ Añadir patrocinador</button>` : '') +
+      `<section class="section tight"><div class="wrap">${all.length ? groups.filter(g => g[1].length).map(([label, list]) => `<h2 class="group-title display">${label}</h2><div class="sponsors ${label === 'Patrocinador técnico oficial' ? 'solo' : ''}">${list.map(card).join('')}</div>`).join('') : `<div class="empty">Todavía no hay patrocinadores publicados.</div>`}</div></section>`;
+  };
+
   pages.historia = async () => {
     const h = await DB.getContent('history', DEFAULT_HISTORY);
     const text = (h.text || '').split(/\n{2,}/).map(block => {
@@ -379,6 +409,11 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
     'add-news': () => newsForm(),
     'edit-news': wrapErr(async (id) => newsForm(await byId('news', 'created_at', id))),
     'del-news': wrapErr(async (id) => { if (!confirmDel('esta publicación')) return; await DB.remove('news', id); toast('Publicación borrada'); if (location.hash.includes('/noticias/')) location.hash = '#/noticias'; else render(); }),
+
+    /* --- patrocinadores --- */
+    'add-sponsor': () => sponsorForm(),
+    'edit-sponsor': wrapErr(async (id) => sponsorForm(await byId('sponsors', 'sort_order', id))),
+    'del-sponsor': wrapErr(async (id) => { if (!confirmDel('este patrocinador')) return; await DB.remove('sponsors', id); toast('Patrocinador borrado'); render(); }),
 
     /* --- historia --- */
     'edit-history': wrapErr(async () => {
@@ -483,6 +518,27 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
         if ((v.available || 0) + (v.away_allocation || 0) > 4850) throw new Error('La suma de entradas locales y de visitantes supera el aforo de 4.850.');
         await DB.save('tickets', { ...(t ? { id: t.id } : {}), rival: v.rival, event_date: v.event_date, competition: v.competition, venue: v.venue, price_adult: v.price_adult, price_junior: v.price_junior, price_senior: v.price_senior, available: v.available ?? 0, away_allocation: v.away_allocation ?? 0, on_sale: v.on_sale });
         toast(t ? 'Entradas actualizadas' : 'Entradas añadidas'); render();
+      }
+    });
+  }
+
+  function sponsorForm(s) {
+    openForm({
+      title: s ? 'Editar patrocinador' : 'Añadir patrocinador',
+      values: s || { tier: 'oficial', sort_order: 100 },
+      fields: [
+        { name: 'name', label: 'Nombre de la empresa', required: true },
+        { name: 'role', label: 'Qué patrocina', placeholder: 'Ej: Patrocinador de la tribuna principal' },
+        { name: 'tier', label: 'Categoría', type: 'select', options: [['principal', 'Patrocinador técnico / principal'], ['oficial', 'Patrocinador oficial'], ['colaborador', 'Colaborador']] },
+        { name: 'description', label: 'Resumen: a qué se dedica', type: 'textarea', rows: 4 },
+        { name: 'logo_url', label: 'Logo', type: 'image' },
+        { name: 'website_url', label: 'Página web (opcional)', type: 'url', placeholder: 'https://…' },
+        { name: 'sort_order', label: 'Orden', type: 'number', min: 0, hint: 'Los números más bajos aparecen primero dentro de su categoría.' }
+      ],
+      onSubmit: async (v) => {
+        const logo = await resolveImage(v, 'logo_url', s && s.logo_url, 'patrocinadores');
+        await DB.save('sponsors', { ...(s ? { id: s.id } : {}), name: v.name, role: v.role, tier: v.tier, description: v.description, logo_url: logo, website_url: v.website_url || null, sort_order: v.sort_order ?? 100 });
+        toast(s ? 'Patrocinador actualizado' : 'Patrocinador añadido'); render();
       }
     });
   }
