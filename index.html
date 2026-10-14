@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Worthing Mariners AFC</title>
+  <meta name="description" content="Web del Worthing Mariners AFC: noticias, partidos, plantilla, entradas e historia del club.">
+  <link rel="icon" href="assets/escudo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="adminbar"></div>
+
+  <header class="site-header">
+    <div class="wrap bar">
+      <a class="brand" href="#/" aria-label="Inicio">
+        <img src="assets/escudo.png" alt="Escudo del Worthing Mariners">
+        <span class="display">Worthing<b>Mariners</b> AFC</span>
+      </a>
+      <button class="burger" id="burger" aria-label="Menú" aria-expanded="false"><span></span><span></span><span></span></button>
+      <nav id="nav" aria-label="Principal">
+        <a href="#/noticias" data-nav="noticias">Noticias</a>
+        <a href="#/partidos" data-nav="partidos">Partidos</a>
+        <a href="#/plantilla" data-nav="plantilla">Plantilla</a>
+        <a href="#/tickets" data-nav="tickets">Tickets</a>
+        <a href="#/historia" data-nav="historia">Historia</a>
+        <button class="login-btn" id="loginBtn" data-act="login">Acceso club</button>
+      </nav>
+    </div>
+  </header>
+
+  <main id="app"><div class="wrap loading">Cargando…</div></main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <img src="assets/escudo.png" alt="">
+      <div>
+        <p class="display">Worthing Mariners AFC</p>
+        <p>Harbour Lane · Worthing, West Sussex · Fundado en 2016</p>
+        <p class="small">Born by the sea. Built by the people. — Club ficticio creado para un modo carrera de FC 27. Escudo y marca no oficiales.</p>
+      </div>
+    </div>
+  </footer>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/config.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
