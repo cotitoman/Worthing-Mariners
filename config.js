@@ -8,8 +8,7 @@
    ============================================================ */
 window.SITE_CONFIG = {
   SUPABASE_URL: "https://mgrlfnxazegghitqtyse.supabase.co",        // ej: "https://abcdxyz.supabase.co"
-  SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ncmxmbnhhemVnZ2hpdHF0eXNlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5MzkxMDUsImV4cCI6MjEwNzUxNTEwNX0.FpCc50ThqnWCz3u67RKi44QYWNZMf5l_0Sq9ycMOLgQ
-",   // la clave "anon public" (es pública por diseño)
+  SUPABASE_ANON_KEY: "sb_publishable_HOAZlYq6WPTOT-ZsPWC8oA_fwDUeGtc",   // la clave "anon public" (es pública por diseño)
   ADMIN_EMAIL: "cotitoyanezleon@gmail.com",         // el correo de la cuenta de administrador
   BUCKET: "media"          // bucket de Storage (no cambiar si usas setup.sql)
 };
