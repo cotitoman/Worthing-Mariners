@@ -238,7 +238,7 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
       <div class="fact"><b>51 %</b><span>En manos de los aficionados</span></div>
       <div class="fact"><b>10 → 4</b><span>Del nivel 10 al nivel 4</span></div>
     </div></section>
-    <section class="banner"><div class="wrap"><h2 class="display">Born by the sea. <span>Built by the people.</span></h2><p>«You can change the name and badge, but you can't take Worthing from its people!»</p></div></section>`;
+    <section class="banner"><div class="wrap"><h2 class="display">Born by the sea. <span>Built by the people.</span></h2><p>«You can change the name and badge, but you can't take Worthing from its people!»</p><p style="margin-top:20px"><a class="btn" href="#/contacto">Colabora con el club</a></p></div></section>`;
   };
 
   pages.noticias = async () => {
@@ -338,8 +338,47 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
     };
     const known = TIERS.map(t => t[0]);
     const groups = TIERS.map(([k, label]) => [label, all.filter(s => (known.includes(s.tier) ? s.tier : 'colaborador') === k)]);
-    return pageHead('Patrocinadores', 'Las empresas que apoyan al Worthing Mariners y a su comunidad. Gracias por creer en un club de su gente.', isAdmin ? `<button class="adm-add" data-act="add-sponsor">+ Añadir patrocinador</button>` : '') +
+    return pageHead('Patrocinadores', 'Las empresas que apoyan al Worthing Mariners y a su comunidad. Gracias por creer en un club de su gente.', (isAdmin ? `<button class="adm-add" data-act="add-sponsor">+ Añadir patrocinador</button>` : `<a class="btn sm" href="#/contacto">¿Quieres patrocinarnos?</a>`)) +
       `<section class="section tight"><div class="wrap">${all.length ? groups.filter(g => g[1].length).map(([label, list]) => `<h2 class="group-title display">${label}</h2><div class="sponsors ${label === 'Patrocinador técnico oficial' ? 'solo' : ''}">${list.map(card).join('')}</div>`).join('') : `<div class="empty">Todavía no hay patrocinadores publicados.</div>`}</div></section>`;
+  };
+
+  /* ---------- Contacto ---------- */
+  const SUBJECTS = [['colaborar', 'Quiero colaborar o patrocinar'], ['prensa', 'Prensa y medios'], ['consulta', 'Consulta general'], ['otro', 'Otro motivo']];
+  const SUBJECT_LABEL = Object.fromEntries(SUBJECTS);
+  const DEFAULT_CONTACT = { email: '', text: '¿Quieres colaborar con el Worthing Mariners, proponernos una idea o simplemente escribirnos? Déjanos un mensaje y el club te responderá. Somos un club de su gente: tu voz cuenta.' };
+
+  pages.contacto = async () => {
+    const info = { ...DEFAULT_CONTACT, ...(await DB.getContent('contact', DEFAULT_CONTACT).catch(() => DEFAULT_CONTACT)) };
+    let inbox = '';
+    if (isAdmin) {
+      let msgs = [];
+      let err = '';
+      try { msgs = await DB.list('messages', 'created_at', false); } catch (e) { err = 'Falta ejecutar contact.sql en Supabase para activar los mensajes.'; }
+      const unread = msgs.filter(m => !m.is_read).length;
+      inbox = `<section class="section"><div class="wrap">
+        <div class="sec-head"><h2 class="display">Mensajes recibidos ${unread ? `<span class="tag t">${unread} sin leer</span>` : ''}</h2></div>
+        ${err ? `<div class="empty">${esc(err)}</div>` : msgs.length ? `<div class="msgs">${msgs.map(m => `<article class="msg ${m.is_read ? '' : 'new'}">
+          <div class="msg-top"><b>${esc(m.name)}</b> · <a href="mailto:${esc(m.email)}?subject=${encodeURIComponent('Re: ' + (SUBJECT_LABEL[m.subject] || 'Tu mensaje'))}">${esc(m.email)}</a><span class="tag">${esc(SUBJECT_LABEL[m.subject] || m.subject)}</span><span class="when">${esc(fmtShort(m.created_at))} · ${esc(fmtTime(m.created_at))}</span></div>
+          <p>${esc(m.message).replace(/\n/g, '<br>')}</p>
+          <span class="adm"><button data-act="toggle-msg" data-id="${m.id}">${m.is_read ? 'Marcar como no leído' : 'Marcar como leído'}</button><button class="del" data-act="del-msg" data-id="${m.id}">Borrar</button></span>
+        </article>`).join('')}</div>` : `<div class="empty">Aún no has recibido mensajes.</div>`}
+      </div></section>`;
+    }
+    return pageHead('Contacto', 'Escríbenos para colaborar con el club.', isAdmin ? `<button class="adm-add" data-act="edit-contact">✎ Editar datos de contacto</button>` : '') +
+      `<section class="section tight"><div class="wrap contact-grid">
+        <div class="prose"><h3 class="display">Hablemos</h3>${paragraphs(info.text)}
+          ${info.email ? `<p class="mail">Correo del club: <a href="mailto:${esc(info.email)}">${esc(info.email)}</a></p>` : ''}
+          <p class="small-note">Club ficticio: los mensajes se guardan solo para el administrador de esta web.</p></div>
+        <form class="contact-form" id="contactForm" novalidate>
+          <div class="field"><label for="c_name">Nombre *</label><input type="text" id="c_name" name="name" maxlength="100" autocomplete="name"></div>
+          <div class="field"><label for="c_email">Correo *</label><input type="email" id="c_email" name="email" maxlength="200" autocomplete="email"></div>
+          <div class="field"><label for="c_subject">Motivo</label><select id="c_subject" name="subject">${SUBJECTS.map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join('')}</select></div>
+          <div class="field"><label for="c_msg">Mensaje *</label><textarea id="c_msg" name="message" rows="6" maxlength="2000"></textarea><small>Máximo 2.000 caracteres.</small></div>
+          <div class="hp" aria-hidden="true"><label>No rellenes este campo<input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>
+          <p class="form-err" role="alert"></p>
+          <button type="submit" class="btn">Enviar mensaje</button>
+        </form>
+      </div></section>` + inbox;
   };
 
   pages.historia = async () => {
@@ -409,6 +448,22 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
     'add-news': () => newsForm(),
     'edit-news': wrapErr(async (id) => newsForm(await byId('news', 'created_at', id))),
     'del-news': wrapErr(async (id) => { if (!confirmDel('esta publicación')) return; await DB.remove('news', id); toast('Publicación borrada'); if (location.hash.includes('/noticias/')) location.hash = '#/noticias'; else render(); }),
+
+    /* --- contacto --- */
+    'edit-contact': wrapErr(async () => {
+      const cur = { ...DEFAULT_CONTACT, ...(await DB.getContent('contact', DEFAULT_CONTACT)) };
+      openForm({
+        title: 'Datos de contacto',
+        values: cur,
+        fields: [
+          { name: 'text', label: 'Texto de presentación', type: 'textarea', rows: 5 },
+          { name: 'email', label: 'Correo público del club (opcional)', type: 'email', hint: 'Si lo dejas vacío, solo se muestra el formulario.' }
+        ],
+        onSubmit: async (v) => { await DB.setContent('contact', { text: v.text, email: v.email }); toast('Datos de contacto actualizados'); render(); }
+      });
+    }),
+    'toggle-msg': wrapErr(async (id) => { const m = await byId('messages', 'created_at', id); await DB.save('messages', { ...m, is_read: !m.is_read }); render(); }),
+    'del-msg': wrapErr(async (id) => { if (!confirmDel('este mensaje')) return; await DB.remove('messages', id); toast('Mensaje borrado'); render(); }),
 
     /* --- patrocinadores --- */
     'add-sponsor': () => sponsorForm(),
@@ -573,6 +628,35 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
   }
 
   /* ---------- Eventos globales ---------- */
+  /* ---------- Envío del formulario de contacto ---------- */
+  document.addEventListener('submit', async (e) => {
+    const form = e.target.closest('#contactForm');
+    if (!form) return;
+    e.preventDefault();
+    const err = $('.form-err', form), btn = $('button[type=submit]', form);
+    const v = Object.fromEntries(new FormData(form).entries());
+    const fail = (m) => { err.textContent = m; };
+    err.textContent = '';
+    if (v.website) { form.outerHTML = '<div class="notice"><b>¡Gracias!</b> Hemos recibido tu mensaje.</div>'; return; } // campo trampa: es un robot
+    v.name = (v.name || '').trim(); v.email = (v.email || '').trim(); v.message = (v.message || '').trim();
+    if (!v.name) return fail('Escribe tu nombre.');
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v.email)) return fail('Escribe un correo válido.');
+    if (v.message.length < 5) return fail('El mensaje es muy corto.');
+    if (v.message.length > 2000) return fail('El mensaje supera los 2.000 caracteres.');
+    let last = 0; try { last = Number(localStorage.getItem('wm_last_msg') || 0); } catch (x) { /* sin almacenamiento */ }
+    if (Date.now() - last < 60000) return fail('Espera un minuto antes de enviar otro mensaje.');
+    btn.disabled = true; btn.textContent = 'Enviando…';
+    try {
+      await DB.submit('messages', { name: v.name, email: v.email, subject: SUBJECT_LABEL[v.subject] ? v.subject : 'otro', message: v.message });
+      try { localStorage.setItem('wm_last_msg', String(Date.now())); } catch (x) { /* ok */ }
+      form.outerHTML = '<div class="notice"><b>¡Gracias, ' + esc(v.name) + '!</b> Hemos recibido tu mensaje y el club te responderá pronto.</div>';
+    } catch (ex) {
+      console.error(ex);
+      fail('No se pudo enviar el mensaje. Inténtalo de nuevo más tarde.');
+      btn.disabled = false; btn.textContent = 'Enviar mensaje';
+    }
+  });
+
   document.addEventListener('click', (e) => {
     const el = e.target.closest('[data-act]');
     if (el) {

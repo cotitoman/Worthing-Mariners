@@ -108,6 +108,14 @@
       LS.set(table, rows); return clean;
     },
 
+    /* Envío público (formulario de contacto): inserta sin leer de vuelta, porque el visitante no tiene permiso de lectura */
+    async submit(table, row) {
+      if (REMOTE) { const { error } = await sb.from(table).insert(row); if (error) throw error; return; }
+      const rows = localRows(table);
+      rows.push({ ...row, id: uid(), is_read: false, created_at: new Date().toISOString() });
+      LS.set(table, rows);
+    },
+
     async remove(table, id) {
       if (REMOTE) { const { error } = await sb.from(table).delete().eq('id', id); if (error) throw error; return; }
       LS.set(table, localRows(table).filter(r => r.id !== id));

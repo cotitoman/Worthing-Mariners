@@ -252,3 +252,23 @@ dialog.modal::backdrop{background:rgba(6,20,46,.7)}
   .brand .display{font-size:17px}
   .wrap{padding:0 16px}
 }
+
+/* ---------- Contacto ---------- */
+.contact-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:40px;align-items:start}
+@media(max-width:860px){.contact-grid{grid-template-columns:1fr}}
+.contact-form{background:#fff;padding:22px 22px 24px;box-shadow:0 2px 0 var(--line);border-top:5px solid var(--turq);display:grid;gap:14px}
+.contact-form .form-err{margin:0}
+.contact-form .btn{justify-self:start;border:0}
+.hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+.mail{font-weight:600}
+.mail a{color:var(--turq-d)}
+.small-note{font-size:13px;color:var(--muted)}
+.flink{color:var(--turq);text-decoration:none;font-weight:600}
+.flink:hover{text-decoration:underline}
+.msgs{display:grid;gap:14px}
+.msg{background:#fff;padding:14px 18px 16px;box-shadow:0 2px 0 var(--line);border-left:5px solid var(--line)}
+.msg.new{border-left-color:var(--turq);background:#f3fdfd}
+.msg-top{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:15px}
+.msg-top a{color:var(--turq-d)}
+.msg-top .when{margin-left:auto;color:var(--muted);font-size:13px}
+.msg p{margin:8px 0 10px;overflow-wrap:anywhere}
