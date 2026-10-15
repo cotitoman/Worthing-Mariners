@@ -204,6 +204,52 @@
       return !!u && !!u.email && u.email.toLowerCase() === adminEmail;
     },
 
+    /* ---------- Membresías ---------- */
+    async myMembership() {
+      const u = await DB.user(); if (!u) return null;
+      if (REMOTE) {
+        const { data, error } = await sb.from('memberships').select('*').eq('user_id', u.id).maybeSingle();
+        if (error) return null; return data || null;
+      }
+      return localRows('memberships').find(m => m.user_id === u.id) || null;
+    },
+    async buyMembership(plan) {
+      if (REMOTE) { const { error } = await sb.rpc('buy_membership', { p_plan: plan.id }); if (error) throw error; return; }
+      const u = await DB.user(); if (!u) throw new Error('Debes iniciar sesión.');
+      await DB.assignMembership(u.id, plan, 'compra');
+    },
+    /* Asigna (o cambia) el plan de un usuario. Solo el admin puede hacerlo (RLS en Supabase). */
+    async assignMembership(userId, plan, source = 'admin') {
+      const now = new Date(), exp = new Date(now); exp.setFullYear(exp.getFullYear() + 1);
+      const row = { user_id: userId, plan_id: plan.id, plan_name: plan.name, discount_pct: plan.discount_pct || 0, shirt: plan.shirt || 'none', source, starts_at: now.toISOString(), expires_at: exp.toISOString() };
+      const prev = REMOTE ? null : localRows('memberships').find(m => m.user_id === userId);
+      if (REMOTE) {
+        const { data: old } = await sb.from('memberships').select('shirt,shirt_delivered').eq('user_id', userId).maybeSingle();
+        row.shirt_delivered = !!(old && old.shirt === row.shirt && old.shirt_delivered);
+        const { error } = await sb.from('memberships').upsert(row, { onConflict: 'user_id' }); if (error) throw error; return;
+      }
+      row.shirt_delivered = !!(prev && prev.shirt === row.shirt && prev.shirt_delivered);
+      const rows = localRows('memberships').filter(m => m.user_id !== userId);
+      rows.push({ ...row, id: uid(), created_at: now.toISOString() }); LS.set('memberships', rows);
+    },
+    async setShirtDelivered(userId, val) {
+      if (REMOTE) { const { error } = await sb.from('memberships').update({ shirt_delivered: val }).eq('user_id', userId); if (error) throw error; return; }
+      LS.set('memberships', localRows('memberships').map(m => m.user_id === userId ? { ...m, shirt_delivered: val } : m));
+    },
+    async removeMembership(userId) {
+      if (REMOTE) { const { error } = await sb.from('memberships').delete().eq('user_id', userId); if (error) throw error; return; }
+      LS.set('memberships', localRows('memberships').filter(m => m.user_id !== userId));
+    },
+    /* Lista de usuarios con su membresía (para el admin) */
+    async listMembers() {
+      if (REMOTE) {
+        const [p, m] = await Promise.all([sb.from('profiles').select('*').order('created_at', { ascending: false }), sb.from('memberships').select('*')]);
+        if (p.error) throw p.error; if (m.error) throw m.error;
+        return (p.data || []).map(x => ({ id: x.id, email: x.email, name: x.name, membership: (m.data || []).find(y => y.user_id === x.id) || null }));
+      }
+      return LS.get('demo_users', []).map(x => ({ id: x.id, email: x.email, name: x.name, membership: localRows('memberships').find(y => y.user_id === x.id) || null }));
+    },
+
     onAuth(cb) {
       listeners.push(cb);
       if (REMOTE) sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_IN' || ev === 'SIGNED_OUT') cb(); });

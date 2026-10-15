@@ -438,20 +438,30 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
 
   pages.cuenta = async () => {
     if (!me) return pageHead('Mi cuenta', 'Entra para ver tu cuenta.', '') + `<section class="sec"><div class="wrap"><p>Necesitas una cuenta para ver esta página.</p><button class="btn" data-act="login">Entrar</button> <button class="btn ghost" data-act="signup">Crear cuenta</button></div></section>`;
+    const m = await DB.myMembership().catch(() => null), act = isActive(m);
+    const card = m ? `<div class="carnet ${act ? '' : 'off'}"><div class="cn-top"><img src="escudo.png" alt=""><span>Worthing Mariners AFC</span></div>
+      <small>Carnet de socio</small><h3 class="display">${esc(m.plan_name)}</h3><div class="cn-name">${esc(me.name)}</div>
+      <div class="cn-row"><span>${act ? 'Válido hasta' : 'Venció el'} <b>${fmtDate(m.expires_at)}</b></span><span>${Number(m.discount_pct) ? `<b>${Number(m.discount_pct)} %</b> dto. en entradas` : ''}</span></div>
+      ${SHIRT[m.shirt] ? `<div class="cn-shirt">${SHIRT[m.shirt]}: <b>${m.shirt_delivered ? 'entregada ✓' : 'pendiente de entrega'}</b></div>` : ''}</div>` : '';
     return pageHead('Mi cuenta', 'Tu perfil en el Worthing Mariners.', '') + `<section class="sec"><div class="wrap"><div class="acct">
-      <span class="tag t">${isAdmin ? 'Administrador' : 'Aficionado'}</span>
+      <span class="tag t">${isAdmin ? 'Administrador' : act ? 'Socio' : 'Aficionado'}</span>
       <h2 class="display">${esc(me.name)}</h2>
       <p class="acct-mail">${esc(me.email)}</p>
-      <p>${isAdmin ? 'Tienes control total del sitio.' : 'Todavía no eres socio del club. Muy pronto podrás elegir un plan de socio y conseguir entradas más baratas y regalos.'}</p>
+      ${card}
+      ${isAdmin && !m ? '<p>Tienes control total del sitio.</p>' : ''}
+      ${act ? '' : `<p>${m ? 'Tu membresía venció.' : 'Todavía no eres socio del club.'} Con un plan tienes entradas más baratas y regalos.</p><a class="btn sm" href="#/socios">Ver planes de socio</a>`}
       <button class="btn ghost sm" data-act="logout">Cerrar sesión</button></div></div></section>`;
   };
 
   /* ---------- Socios ---------- */
+  const isActive = (m) => !!m && new Date(m.expires_at) > new Date();
+  const fmtDate = (d) => new Date(d).toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' });
   const SHIRT = { none: '', camiseta: 'Camiseta oficial de regalo', firmada: 'Camiseta oficial firmada de regalo' };
   pages.socios = async () => {
     let plans;
     try { plans = await DB.list('membership_plans', 'sort_order', true); }
     catch (e) { return pageHead('Socios', '') + `<div class="wrap section"><div class="empty">Esta sección aún no está activada en la base de datos.<br><small>Falta ejecutar <b>plans.sql</b> en Supabase (SQL Editor).</small></div></div>`; }
+    const mem = me ? await DB.myMembership().catch(() => null) : null;
     const card = (p) => {
       const perks = String(p.perks || '').split('\n').map(x => x.trim()).filter(Boolean);
       const items = [Number(p.discount_pct) ? `<b>${Number(p.discount_pct)} % de descuento</b> en todas las entradas` : '', SHIRT[p.shirt] ? `<b>${SHIRT[p.shirt]}</b>` : '', ...perks.map(esc)].filter(Boolean);
@@ -460,14 +470,29 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
         <h3 class="display">${esc(p.name)}</h3>
         <div class="plan-price"><b>${money(p.price)}</b><small>/ año</small></div>
         <ul>${items.map(i => `<li>${i}</li>`).join('')}</ul>
-        <button class="btn" disabled>Próximamente</button>
+        <button class="btn" data-act="buy-plan" data-id="${p.id}">${mem && mem.plan_id === p.id && isActive(mem) ? 'Renovar plan' : 'Comprar ya'}</button>
         ${adm(`<button data-act="edit-plan" data-id="${p.id}">Editar</button><button class="del" data-act="del-plan" data-id="${p.id}">Borrar</button>`)}
       </article>`;
     };
     return pageHead('Socios', 'Hazte socio del Worthing Mariners: entradas más baratas, regalos y la satisfacción de ser parte del club.', isAdmin ? `<button class="adm-add" data-act="add-plan">+ Añadir plan</button>` : '') +
       `<section class="section tight"><div class="wrap">${plans.length ? `<div class="plans">${plans.map(card).join('')}</div>` : `<div class="empty">Todavía no hay planes publicados.</div>`}
-      <p class="zone-note">Club ficticio: no se realizan cobros reales.</p></div></section>`;
+      <p class="zone-note">Club ficticio: la compra es simulada, no se pide tarjeta ni se cobra nada.</p></div></section>` + (isAdmin ? await membersAdmin() : '');
   };
+
+  async function membersAdmin() {
+    let list;
+    try { list = await DB.listMembers(); }
+    catch (e) { return `<section class="section tight"><div class="wrap"><div class="empty">Falta ejecutar <b>members.sql</b> y <b>memberships.sql</b> en Supabase para gestionar socios.</div></div></section>`; }
+    const rows = list.map(u => {
+      const m = u.membership, act = isActive(m);
+      return `<tr><td><b>${esc(u.name || '')}</b><br><small>${esc(u.email || '')}</small></td>
+        <td>${m ? `${esc(m.plan_name)} ${act ? '' : '<span class="tag loss">Vencido</span>'}<br><small>hasta ${fmtDate(m.expires_at)} · ${m.source === 'admin' ? 'asignado' : 'compra'}</small>` : '<small>Sin plan</small>'}</td>
+        <td>${m && SHIRT[m.shirt] ? `<label class="chk"><input type="checkbox" data-act="shirt" data-id="${u.id}" ${m.shirt_delivered ? 'checked' : ''}> Entregada</label>` : '<small>—</small>'}</td>
+        <td class="mt-act"><button class="adm-add" data-act="assign" data-id="${u.id}">${m ? 'Cambiar plan' : 'Asignar plan'}</button>${m ? `<button class="adm-add del" data-act="unassign" data-id="${u.id}">Quitar</button>` : ''}</td></tr>`;
+    }).join('');
+    return `<section class="section tight"><div class="wrap"><h2 class="group-title display">Usuarios y socios</h2>
+      ${list.length ? `<div class="tbl-wrap"><table class="members"><thead><tr><th>Usuario</th><th>Membresía</th><th>Camiseta</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>` : '<div class="empty">Aún no se ha registrado ningún usuario.</div>'}</div></section>`;
+  }
 
   function planForm(p) {
     openForm({
@@ -614,6 +639,21 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
     'del-msg': wrapErr(async (id) => { if (!confirmDel('este mensaje')) return; await DB.remove('messages', id); toast('Mensaje borrado'); render(); }),
 
     /* --- patrocinadores --- */
+    'buy-plan': wrapErr(async (id) => {
+      if (!me) { toast('Primero crea una cuenta o entra para hacerte socio.'); openSignup(); return; }
+      const plan = (await DB.list('membership_plans', 'sort_order', true)).find(p => p.id === id); if (!plan) return;
+      if (!confirm(`Pago simulado (no se pide tarjeta ni se cobra nada).\n\n¿Hacerte socio con el plan ${plan.name} por ${money(plan.price)} al año?`)) return;
+      await DB.buyMembership(plan); toast(`¡Ya eres socio ${plan.name}!`); location.hash = '#/cuenta'; render();
+    }),
+    assign: wrapErr(async (uid) => {
+      const [plans, list] = await Promise.all([DB.list('membership_plans', 'sort_order', true), DB.listMembers()]);
+      const u = list.find(x => x.id === uid); if (!u || !plans.length) return;
+      openForm({ title: 'Plan de ' + (u.name || u.email), submitLabel: 'Asignar', fields: [{ name: 'plan', label: 'Plan (1 año desde hoy)', type: 'select', options: plans.map(p => [p.id, `${p.name} — ${money(p.price)}`]) }],
+        values: { plan: u.membership && u.membership.plan_id },
+        onSubmit: async (v) => { await DB.assignMembership(uid, plans.find(p => p.id === v.plan)); toast('Plan asignado'); render(); } });
+    }),
+    unassign: wrapErr(async (uid) => { if (!confirm('¿Quitar la membresía a este usuario?')) return; await DB.removeMembership(uid); toast('Membresía quitada'); render(); }),
+    shirt: wrapErr(async (uid) => { const el = document.querySelector(`input[data-act="shirt"][data-id="${uid}"]`); await DB.setShirtDelivered(uid, !!(el && el.checked)); toast('Guardado'); }),
     'add-plan': () => planForm(),
     'edit-plan': wrapErr(async (id) => planForm(await byId('membership_plans', 'sort_order', id))),
     'del-plan': wrapErr(async (id) => { if (!confirmDel('este plan')) return; await DB.remove('membership_plans', id); toast('Plan borrado'); render(); }),
@@ -837,7 +877,7 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
     const el = e.target.closest('[data-act]');
     if (el) {
       const fn = actions[el.dataset.act];
-      if (fn) { e.preventDefault(); fn(el.dataset.id); }
+      if (fn) { if (!(el.tagName === 'INPUT' && el.type === 'checkbox')) e.preventDefault(); fn(el.dataset.id); }
       return;
     }
     if (e.target.closest('#burger')) { const nav = $('#nav'); const open = nav.classList.toggle('open'); $('#burger').setAttribute('aria-expanded', String(open)); }
