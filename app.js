@@ -192,6 +192,29 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
       ${su.length ? `<div><h4>Suplentes</h4><ul>${su.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>` : ''}
     </div></details>`;
   }
+  /* ---------- Calendario (.ics) ---------- */
+  const icsEsc = (s) => String(s || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+  const icsDate = (d) => new Date(d).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  const icsFold = (line) => { const out = []; while (line.length > 74) { out.push(line.slice(0, 74)); line = ' ' + line.slice(74); } out.push(line); return out.join('\r\n'); };
+  function matchesToIcs(list) {
+    const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Worthing Mariners AFC//Web del club//ES', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'X-WR-CALNAME:Worthing Mariners AFC'];
+    list.forEach(m => {
+      const start = new Date(m.match_date), end = new Date(start.getTime() + 2 * 3600e3);
+      const title = m.is_home ? `Worthing Mariners vs ${m.rival}` : `${m.rival} vs Worthing Mariners`;
+      lines.push('BEGIN:VEVENT', `UID:${m.id}@worthing-mariners`, `DTSTAMP:${icsDate(new Date())}`, `DTSTART:${icsDate(start)}`, `DTEND:${icsDate(end)}`,
+        `SUMMARY:${icsEsc(title)}`, `LOCATION:${icsEsc(m.venue || (m.is_home ? 'Harbour Lane, Worthing' : ''))}`, `DESCRIPTION:${icsEsc((m.competition || '') + (m.competition ? ' · ' : '') + (m.is_home ? 'Local' : 'Visitante'))}`,
+        'BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:Hoy juega el Mariners', 'TRIGGER:-PT2H', 'END:VALARM', 'END:VEVENT');
+    });
+    lines.push('END:VCALENDAR');
+    return lines.map(icsFold).join('\r\n') + '\r\n';
+  }
+  function downloadIcs(list, name) {
+    const blob = new Blob([matchesToIcs(list)], { type: 'text/calendar;charset=utf-8' });
+    const url = URL.createObjectURL(blob), a = document.createElement('a');
+    a.href = url; a.download = name + '.ics'; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+
   function matchCard(m, dark) {
     const team = (crest, name, right) => `<div class="team ${right ? 'right' : ''}">${crest}<span>${esc(name)}</span></div>`;
     const us = [MARINERS_CREST, 'Worthing Mariners'];
@@ -203,7 +226,7 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
     return `<article class="match ${dark ? 'dark' : ''}">
       <div class="match-meta"><b>${esc(m.competition || '')}</b><span>${esc(fmtLong(m.match_date))}</span></div>
       <div class="match-teams">${team(L[0], L[1], false)}<div class="vs">${score}<small>${m.played ? 'FINAL' : 'VS'}</small></div>${team(R[0], R[1], true)}</div>
-      <div class="match-foot"><span>${m.is_home ? 'Local' : 'Visitante'} · ${esc(m.venue || '')}</span>${resultTag(m)}${adm(`<button data-act="edit-match" data-id="${m.id}">Editar</button><button class="del" data-act="del-match" data-id="${m.id}">Borrar</button>`)}</div>
+      <div class="match-foot"><span>${m.is_home ? 'Local' : 'Visitante'} · ${esc(m.venue || '')}</span>${resultTag(m)}${m.played ? '' : `<button class="cal-btn" data-act="ics" data-id="${m.id}" title="Descargar para tu calendario">📅 Añadir al calendario</button>`}${adm(`<button data-act="edit-match" data-id="${m.id}">Editar</button><button class="del" data-act="del-match" data-id="${m.id}">Borrar</button>`)}</div>
       ${lineupHtml(m)}
     </article>`;
   }
@@ -324,7 +347,7 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
   pages.partidos = async () => {
     const all = await DB.list('matches', 'match_date', true);
     const next = all.filter(m => !m.played), done = all.filter(m => m.played).reverse();
-    return pageHead('Partidos', 'Calendario, resultados y alineaciones del Mariners.', isAdmin ? `<button class="adm-add" data-act="add-match">+ Añadir partido</button>` : '') +
+    return pageHead('Partidos', 'Calendario, resultados y alineaciones del Mariners.', (isAdmin ? `<button class="adm-add" data-act="add-match">+ Añadir partido</button>` : '') + (next.length ? `<button class="btn sm" data-act="ics-all">📅 Descargar todos los partidos</button>` : '')) +
       `<section class="section tight"><div class="wrap">
         <h2 class="group-title display">Próximos partidos</h2>
         ${next.length ? `<div class="match-list">${next.map(m => matchCard(m)).join('')}</div>` : `<div class="empty">No hay partidos programados.</div>`}
@@ -631,6 +654,8 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
   const wrapErr = (fn) => async (...a) => { try { await fn(...a); } catch (e) { console.error(e); toast(e.message || 'Error', true); } };
 
   const actions = {
+    ics: wrapErr(async (id) => { const m = (await DB.list('matches', 'match_date', true)).find(x => x.id === id); if (!m) return; downloadIcs([m], 'mariners-' + m.rival.toLowerCase().replace(/[^a-z0-9]+/g, '-')); toast('Archivo de calendario descargado'); }),
+    'ics-all': wrapErr(async () => { const l = (await DB.list('matches', 'match_date', true)).filter(m => !m.played); if (!l.length) return; downloadIcs(l, 'worthing-mariners-partidos'); toast('Calendario descargado: ábrelo para añadirlo'); }),
     'copy-link': wrapErr(async (id) => { const url = shareUrl(id); try { await navigator.clipboard.writeText(url); } catch (e) { const t = document.createElement('textarea'); t.value = url; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove(); } toast('Enlace copiado'); }),
     'edit-social': wrapErr(async () => {
       const s = (await DB.getContent('social', {})) || {};
