@@ -332,3 +332,7 @@ table.members{width:100%;border-collapse:collapse;min-width:560px}
 table.members th,table.members td{padding:12px 14px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
 table.members th{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
 .mt-act{display:flex;flex-wrap:wrap;gap:6px}
+
+.was{color:var(--muted);font-weight:400;font-size:.62em;margin-right:4px}
+.notice.member{border-left-color:var(--navy);background:#e4ecf8}
+.notice a{color:inherit}

@@ -5,6 +5,7 @@
   const app = $('#app');
   let isAdmin = false;
   let me = null; // cuenta actual (cualquier usuario) o null
+  let myDisc = 0; // % de descuento de socio activo (0 si no es socio)
   let newsFilter = 'todas';
   let renderToken = 0;
 
@@ -13,6 +14,13 @@
   const MONTHS = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'];
   const fmtLong = (iso) => new Date(iso).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   const fmtShort = (iso) => new Date(iso).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
+  const memberPrice = (n) => Math.round(Number(n || 0) * (1 - myDisc / 100) * 100) / 100;
+  const priceHtml = (n) => myDisc > 0 ? `<s class="was">${money(n)}</s> ${money(memberPrice(n))}` : money(n);
+  async function refreshMember() {
+    myDisc = 0;
+    try { const m = me ? await DB.myMembership() : null; if (m && new Date(m.expires_at) > new Date()) myDisc = Number(m.discount_pct) || 0; } catch (e) { /* sin membresía */ }
+    const lb = $('#loginBtn'); if (lb && me && !isAdmin) lb.textContent = myDisc > 0 ? 'Socio ★' : 'Mi cuenta';
+  }
   const fmtTime = (iso) => new Date(iso).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
   const money = (n) => (n == null || n === '') ? '—' : '£' + Number(n).toLocaleString('es-ES', { minimumFractionDigits: Number(n) % 1 ? 2 : 0 });
   const toLocalInput = (iso) => { if (!iso) return ''; const d = new Date(iso); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
@@ -363,7 +371,7 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
       <span class="tag t">${esc(ZONE_KIND[sel.kind] || sel.kind)}</span>
       <h3 class="display">${esc(sel.name)}</h3>
       <div class="zp-cap"><small>Aforo de la zona</small><b>${Number(sel.capacity || 0).toLocaleString('es-ES')}</b> espectadores</div>
-      <div class="prices"><div class="price"><small>Adulto</small><b>${money(sel.price_adult)}</b></div><div class="price"><small>Junior</small><b>${money(sel.price_junior)}</b></div><div class="price"><small>Senior</small><b>${money(sel.price_senior)}</b></div></div>
+      <div class="prices"><div class="price"><small>Adulto</small><b>${priceHtml(sel.price_adult)}</b></div><div class="price"><small>Junior</small><b>${priceHtml(sel.price_junior)}</b></div><div class="price"><small>Senior</small><b>${priceHtml(sel.price_senior)}</b></div></div>
       <p>${esc(sel.description || '')}</p>
       ${adm(`<button data-act="edit-zone" data-id="${sel.slot}">Editar esta zona</button>`)}
     </div>`;
@@ -380,6 +388,7 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
   pages.tickets = async () => {
     const [all, zoneRows] = await Promise.all([DB.list('tickets', 'event_date', true), DB.list('stadium_zones', 'slot', true).catch(() => [])]);
     zonesState = mergeZones(zoneRows);
+    await refreshMember();
     if (!zonesState.some(z => z.slot === selectedSlot)) selectedSlot = 'main';
     const now = Date.now() - 3 * 3600e3;
     const row = (t) => {
@@ -389,7 +398,7 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
         <div class="date"><b>${d.getDate()}</b><span>${MONTHS[d.getMonth()]}</span></div>
         <div class="main"><h3 class="display">Worthing Mariners vs ${esc(t.rival)}</h3>
           <div class="sub">${esc(t.competition || '')} · ${esc(t.venue || 'Harbour Lane')} · ${esc(fmtTime(t.event_date))} h</div>
-          <div class="prices">${zonesState.map(z => `<div class="price"><small>${esc(z.name)}</small><b>${money(scaled(z.price_adult, priceFactor(t)))}</b></div>`).join('')}</div>
+          <div class="prices">${zonesState.map(z => `<div class="price"><small>${esc(z.name)}</small><b>${priceHtml(scaled(z.price_adult, priceFactor(t)))}</b></div>`).join('')}</div>
           <div class="cat-note">Precio de adulto por zona${priceFactor(t) > 1 ? ' · <span class="tag soon">Partido de categoría alta</span>' : priceFactor(t) < 1 ? ' · <span class="tag t">Partido de categoría baja</span>' : ''}</div></div>
         <div class="side">${status}
           <div><span class="big">${Number(t.available || 0).toLocaleString('es-ES')}</span><br>entradas locales disponibles</div>
@@ -399,6 +408,7 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
     };
     return pageHead('Tickets', 'Entradas para los partidos en Harbour Lane.', isAdmin ? `<button class="adm-add" data-act="add-ticket">+ Añadir partido con entradas</button>` : '') +
       `<section class="section tight"><div class="wrap">
+        ${myDisc > 0 ? `<div class="notice member"><b>Precios de socio activados:</b> tienes un ${myDisc} % de descuento en todas las entradas. Los precios tachados son los normales.</div>` : `<div class="notice"><a href="#/socios"><b>Hazte socio</b></a> y ahorra hasta un 30 % en todas tus entradas.</div>`}
         <div class="notice"><b>Club ficticio:</b> la venta es solo informativa, no se realizan cobros reales.</div>
         <div class="sec-head"><h2 class="display">Harbour Lane por zonas</h2></div>
         <div id="stadium">${stadiumInner()}</div>
@@ -439,6 +449,7 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
   pages.cuenta = async () => {
     if (!me) return pageHead('Mi cuenta', 'Entra para ver tu cuenta.', '') + `<section class="sec"><div class="wrap"><p>Necesitas una cuenta para ver esta página.</p><button class="btn" data-act="login">Entrar</button> <button class="btn ghost" data-act="signup">Crear cuenta</button></div></section>`;
     const m = await DB.myMembership().catch(() => null), act = isActive(m);
+    await refreshMember();
     const card = m ? `<div class="carnet ${act ? '' : 'off'}"><div class="cn-top"><img src="escudo.png" alt=""><span>Worthing Mariners AFC</span></div>
       <small>Carnet de socio</small><h3 class="display">${esc(m.plan_name)}</h3><div class="cn-name">${esc(me.name)}</div>
       <div class="cn-row"><span>${act ? 'Válido hasta' : 'Venció el'} <b>${fmtDate(m.expires_at)}</b></span><span>${Number(m.discount_pct) ? `<b>${Number(m.discount_pct)} %</b> dto. en entradas` : ''}</span></div>
@@ -643,16 +654,16 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
       if (!me) { toast('Primero crea una cuenta o entra para hacerte socio.'); openSignup(); return; }
       const plan = (await DB.list('membership_plans', 'sort_order', true)).find(p => p.id === id); if (!plan) return;
       if (!confirm(`Pago simulado (no se pide tarjeta ni se cobra nada).\n\n¿Hacerte socio con el plan ${plan.name} por ${money(plan.price)} al año?`)) return;
-      await DB.buyMembership(plan); toast(`¡Ya eres socio ${plan.name}!`); location.hash = '#/cuenta'; render();
+      await DB.buyMembership(plan); await refreshMember(); toast(`¡Ya eres socio ${plan.name}!`); location.hash = '#/cuenta'; render();
     }),
     assign: wrapErr(async (uid) => {
       const [plans, list] = await Promise.all([DB.list('membership_plans', 'sort_order', true), DB.listMembers()]);
       const u = list.find(x => x.id === uid); if (!u || !plans.length) return;
       openForm({ title: 'Plan de ' + (u.name || u.email), submitLabel: 'Asignar', fields: [{ name: 'plan', label: 'Plan (1 año desde hoy)', type: 'select', options: plans.map(p => [p.id, `${p.name} — ${money(p.price)}`]) }],
         values: { plan: u.membership && u.membership.plan_id },
-        onSubmit: async (v) => { await DB.assignMembership(uid, plans.find(p => p.id === v.plan)); toast('Plan asignado'); render(); } });
+        onSubmit: async (v) => { await DB.assignMembership(uid, plans.find(p => p.id === v.plan)); await refreshMember(); toast('Plan asignado'); render(); } });
     }),
-    unassign: wrapErr(async (uid) => { if (!confirm('¿Quitar la membresía a este usuario?')) return; await DB.removeMembership(uid); toast('Membresía quitada'); render(); }),
+    unassign: wrapErr(async (uid) => { if (!confirm('¿Quitar la membresía a este usuario?')) return; await DB.removeMembership(uid); await refreshMember(); toast('Membresía quitada'); render(); }),
     shirt: wrapErr(async (uid) => { const el = document.querySelector(`input[data-act="shirt"][data-id="${uid}"]`); await DB.setShirtDelivered(uid, !!(el && el.checked)); toast('Guardado'); }),
     'add-plan': () => planForm(),
     'edit-plan': wrapErr(async (id) => planForm(await byId('membership_plans', 'sort_order', id))),
@@ -888,8 +899,8 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
   (async function init() {
     if (DB.wantsRemote && !DB.REMOTE) toast('No se pudo cargar Supabase: revisa tu conexión.', true);
     try { isAdmin = await DB.isAdmin(); me = await DB.user(); } catch (e) { isAdmin = false; me = null; }
-    updateChrome();
-    DB.onAuth(async () => { try { isAdmin = await DB.isAdmin(); me = await DB.user(); } catch (e) { isAdmin = false; me = null; } updateChrome(); render(); });
+    updateChrome(); await refreshMember();
+    DB.onAuth(async () => { try { isAdmin = await DB.isAdmin(); me = await DB.user(); } catch (e) { isAdmin = false; me = null; } updateChrome(); await refreshMember(); render(); });
     render();
   })();
 })();
