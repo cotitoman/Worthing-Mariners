@@ -29,6 +29,11 @@
       { id: uid(), slot: 'opposite', name: 'Family Stand', kind: 'asiento', capacity: 1100, price_adult: 22, price_junior: 7, price_senior: 15, description: 'La tribuna lateral frente a la principal, pensada para familias y aficionados jóvenes. Asientos cubiertos y un ambiente más tranquilo.', created_at: at(-400) },
       { id: uid(), slot: 'south', name: 'South End', kind: 'visitantes', capacity: 950, price_adult: 16, price_junior: 6, price_senior: 12, description: 'El extremo sur, de pie, reservado a los aficionados visitantes.', created_at: at(-400) }
     ],
+    membership_plans: [
+      { id: uid(), name: 'Supporter', price: 20, discount_pct: 10, shirt: 'none', perks: 'Carnet digital de socio\nNoticias exclusivas para socios', highlight: false, sort_order: 10, created_at: at(-300) },
+      { id: uid(), name: 'Mariner', price: 60, discount_pct: 20, shirt: 'camiseta', perks: 'Carnet digital de socio\nPrioridad de compra de entradas\nNoticias exclusivas para socios', highlight: true, sort_order: 20, created_at: at(-300) },
+      { id: uid(), name: "Captain's Club", price: 150, discount_pct: 30, shirt: 'firmada', perks: 'Carnet digital de socio\nPrioridad de compra de entradas\nGrada Main Stand reservada\nVisita al Michael Callahan Training Centre', highlight: false, sort_order: 30, created_at: at(-300) }
+    ],
     sponsors: [
       { id: uid(), name: 'Umbro', role: 'Patrocinador técnico oficial', tier: 'principal', sort_order: 10, logo_url: null, website_url: null, created_at: at(-300),
         description: 'Marca deportiva que fabrica las camisetas local, visitante y alternativa, además de la ropa de entrenamiento y parte del equipamiento del club.' },

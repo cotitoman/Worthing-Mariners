@@ -446,6 +446,49 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
       <button class="btn ghost sm" data-act="logout">Cerrar sesión</button></div></div></section>`;
   };
 
+  /* ---------- Socios ---------- */
+  const SHIRT = { none: '', camiseta: 'Camiseta oficial de regalo', firmada: 'Camiseta oficial firmada de regalo' };
+  pages.socios = async () => {
+    let plans;
+    try { plans = await DB.list('membership_plans', 'sort_order', true); }
+    catch (e) { return pageHead('Socios', '') + `<div class="wrap section"><div class="empty">Esta sección aún no está activada en la base de datos.<br><small>Falta ejecutar <b>plans.sql</b> en Supabase (SQL Editor).</small></div></div>`; }
+    const card = (p) => {
+      const perks = String(p.perks || '').split('\n').map(x => x.trim()).filter(Boolean);
+      const items = [Number(p.discount_pct) ? `<b>${Number(p.discount_pct)} % de descuento</b> en todas las entradas` : '', SHIRT[p.shirt] ? `<b>${SHIRT[p.shirt]}</b>` : '', ...perks.map(esc)].filter(Boolean);
+      return `<article class="plan ${p.highlight ? 'hl' : ''}">
+        ${p.highlight ? '<span class="tag t">El más popular</span>' : ''}
+        <h3 class="display">${esc(p.name)}</h3>
+        <div class="plan-price"><b>${money(p.price)}</b><small>/ año</small></div>
+        <ul>${items.map(i => `<li>${i}</li>`).join('')}</ul>
+        <button class="btn" disabled>Próximamente</button>
+        ${adm(`<button data-act="edit-plan" data-id="${p.id}">Editar</button><button class="del" data-act="del-plan" data-id="${p.id}">Borrar</button>`)}
+      </article>`;
+    };
+    return pageHead('Socios', 'Hazte socio del Worthing Mariners: entradas más baratas, regalos y la satisfacción de ser parte del club.', isAdmin ? `<button class="adm-add" data-act="add-plan">+ Añadir plan</button>` : '') +
+      `<section class="section tight"><div class="wrap">${plans.length ? `<div class="plans">${plans.map(card).join('')}</div>` : `<div class="empty">Todavía no hay planes publicados.</div>`}
+      <p class="zone-note">Club ficticio: no se realizan cobros reales.</p></div></section>`;
+  };
+
+  function planForm(p) {
+    openForm({
+      title: p ? 'Editar plan' : 'Nuevo plan de socio',
+      values: p || { discount_pct: 10, shirt: 'none', sort_order: 100 },
+      fields: [
+        { name: 'name', label: 'Nombre del plan', required: true },
+        { name: 'price', label: 'Precio por año (£)', type: 'number', min: 0, step: 0.5, required: true },
+        { name: 'discount_pct', label: 'Descuento en entradas (%)', type: 'number', min: 0, max: 100 },
+        { name: 'shirt', label: 'Regalo de camiseta', type: 'select', options: [['none', 'Sin camiseta'], ['camiseta', 'Camiseta oficial'], ['firmada', 'Camiseta firmada']] },
+        { name: 'perks', label: 'Otros beneficios (uno por línea)', type: 'textarea', rows: 5 },
+        { name: 'highlight', label: 'Destacar como «El más popular»', type: 'checkbox' },
+        { name: 'sort_order', label: 'Orden (menor aparece antes)', type: 'number' }
+      ],
+      onSubmit: async (v) => {
+        await DB.save('membership_plans', { ...(p ? { id: p.id } : {}), name: v.name, price: v.price ?? 0, discount_pct: v.discount_pct ?? 0, shirt: v.shirt, perks: v.perks, highlight: v.highlight, sort_order: v.sort_order ?? 100 });
+        toast('Plan guardado'); render();
+      }
+    });
+  }
+
   pages.contacto = async () => {
     const info = { ...DEFAULT_CONTACT, ...(await DB.getContent('contact', DEFAULT_CONTACT).catch(() => DEFAULT_CONTACT)) };
     let inbox = '';
@@ -571,6 +614,9 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
     'del-msg': wrapErr(async (id) => { if (!confirmDel('este mensaje')) return; await DB.remove('messages', id); toast('Mensaje borrado'); render(); }),
 
     /* --- patrocinadores --- */
+    'add-plan': () => planForm(),
+    'edit-plan': wrapErr(async (id) => planForm(await byId('membership_plans', 'sort_order', id))),
+    'del-plan': wrapErr(async (id) => { if (!confirmDel('este plan')) return; await DB.remove('membership_plans', id); toast('Plan borrado'); render(); }),
     'add-sponsor': () => sponsorForm(),
     'edit-sponsor': wrapErr(async (id) => sponsorForm(await byId('sponsors', 'sort_order', id))),
     'del-sponsor': wrapErr(async (id) => { if (!confirmDel('este patrocinador')) return; await DB.remove('sponsors', id); toast('Patrocinador borrado'); render(); }),

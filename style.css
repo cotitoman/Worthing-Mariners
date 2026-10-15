@@ -307,3 +307,13 @@ dialog.modal::backdrop{background:rgba(6,20,46,.7)}
 .acct{max-width:560px;background:#fff;padding:28px;box-shadow:0 2px 0 var(--line);border-top:5px solid var(--turq);display:grid;gap:10px;justify-items:start}
 .acct h2{font-size:38px;color:var(--navy)}
 .acct-mail{color:var(--muted);margin:0}
+
+/* ---------- Socios ---------- */
+.plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(260px,100%),1fr));gap:24px;align-items:stretch}
+.plan{background:#fff;padding:26px;box-shadow:0 2px 0 var(--line);border-top:5px solid var(--navy);display:flex;flex-direction:column;gap:14px;align-items:flex-start}
+.plan.hl{border-top-color:var(--turq);box-shadow:0 0 0 2px var(--turq)}
+.plan h3{font-size:34px;color:var(--navy)}
+.plan-price b{font-family:'Barlow Condensed',sans-serif;font-size:46px;color:var(--navy)}
+.plan-price small{color:var(--muted);margin-left:6px}
+.plan ul{margin:0;padding:0 0 0 18px;display:grid;gap:8px;flex:1;align-content:start}
+.plan .btn[disabled]{opacity:.55;cursor:not-allowed}
