@@ -294,8 +294,75 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
       `<section class="section tight"><div class="wrap">${players.length ? groups.filter(g => g[1].length).map(([n, ps]) => `<h2 class="group-title display">${n}</h2><div class="squad">${ps.map(card).join('')}</div>`).join('') : `<div class="empty">La plantilla aún no tiene jugadores.</div>`}</div></section>`;
   };
 
+  /* ---------- Mapa interactivo del estadio ---------- */
+  const SLOTS = ['north', 'main', 'opposite', 'south'];
+  const DEFAULT_ZONES = {
+    north: { slot: 'north', name: 'The Dock', kind: 'pie', capacity: 1600, price_adult: 15, price_junior: 5, price_senior: 10, description: 'La grada más ruidosa de Harbour Lane, en el extremo norte. Aquí se concentran los seguidores más apasionados del Mariners, con banderas azul marino y turquesa y cánticos durante todo el partido.' },
+    main: { slot: 'main', name: 'Main Stand', kind: 'asiento', capacity: 1200, price_adult: 28, price_junior: 10, price_senior: 20, description: 'La grada principal, junto a los vestuarios, la zona de prensa y los espacios de patrocinadores. Asientos cubiertos con la mejor vista del campo.' },
+    opposite: { slot: 'opposite', name: 'Family Stand', kind: 'asiento', capacity: 1100, price_adult: 22, price_junior: 7, price_senior: 15, description: 'La tribuna lateral frente a la principal, pensada para familias y aficionados jóvenes. Asientos cubiertos y un ambiente más tranquilo.' },
+    south: { slot: 'south', name: 'South End', kind: 'visitantes', capacity: 950, price_adult: 16, price_junior: 6, price_senior: 12, description: 'El extremo sur, de pie, reservado a los aficionados visitantes.' }
+  };
+  const ZONE_KIND = { asiento: 'Asientos', pie: 'De pie', visitantes: 'Visitantes' };
+  const ZONE_GEO = {
+    north: { d: 'M120,112 L440,112 L480,40 L80,40 Z', x: 280, y: 76, rot: 0 },
+    south: { d: 'M120,408 L440,408 L480,480 L80,480 Z', x: 280, y: 444, rot: 0 },
+    main: { d: 'M122,130 L122,390 L50,430 L50,90 Z', x: 86, y: 260, rot: -90 },
+    opposite: { d: 'M438,130 L438,390 L510,430 L510,90 Z', x: 474, y: 260, rot: 90 }
+  };
+  const TIER_FILL = ['#d6f5f6', '#8fe0e2', '#2fbfc3', '#14346a'];
+  const TIER_TEXT = ['#0a1f44', '#0a1f44', '#0a1f44', '#ffffff'];
+  let zonesState = SLOTS.map(s => ({ ...DEFAULT_ZONES[s] }));
+  let selectedSlot = 'main';
+
+  const mergeZones = (rows) => SLOTS.map(s => ({ ...DEFAULT_ZONES[s], ...((rows || []).find(r => r.slot === s) || {}) }));
+  const priceFactor = (t) => (t && Number(t.price_factor) > 0) ? Number(t.price_factor) : 1;
+  const scaled = (n, f) => Math.round(Number(n || 0) * f * 2) / 2;
+  const tierOf = (zones) => {
+    const distinct = [...new Set(zones.map(z => Number(z.price_adult) || 0))].sort((x, y) => x - y);
+    return (z) => { const i = distinct.indexOf(Number(z.price_adult) || 0); return distinct.length > 1 ? Math.round(i / (distinct.length - 1) * (TIER_FILL.length - 1)) : 1; };
+  };
+
+  function stadiumInner() {
+    const zones = zonesState, tier = tierOf(zones);
+    const sel = zones.find(z => z.slot === selectedSlot) || zones[0];
+    const shapes = SLOTS.map(slot => {
+      const z = zones.find(q => q.slot === slot), g = ZONE_GEO[slot], t = tier(z);
+      return `<g class="zone ${z.slot === sel.slot ? 'sel' : ''}" data-act="pick-zone" data-id="${slot}" role="button" tabindex="0" aria-pressed="${z.slot === sel.slot}" aria-label="${esc(z.name)}, ${esc(ZONE_KIND[z.kind] || '')}, adulto ${esc(money(z.price_adult))}">
+        <polygon points="${g.d.replace(/[MLZ]/g, ' ').trim()}" fill="${TIER_FILL[t]}" ${z.kind === 'visitantes' ? 'stroke-dasharray="8 5"' : ''}/>
+        <g transform="rotate(${g.rot} ${g.x} ${g.y})" fill="${TIER_TEXT[t]}" text-anchor="middle" pointer-events="none">
+          <text x="${g.x}" y="${g.y - 2}" class="zn">${esc(z.name)}</text><text x="${g.x}" y="${g.y + 20}" class="zp">${esc(money(z.price_adult))}</text></g></g>`;
+    }).join('');
+    const svg = `<svg viewBox="0 0 560 520" class="stadium-svg" role="group" aria-label="Plano de Harbour Lane">
+      <title>Plano de Harbour Lane por zonas de precio</title>
+      <rect x="10" y="10" width="540" height="500" rx="18" class="st-bg"/>
+      <g class="st-pitch"><rect x="140" y="130" width="280" height="260" rx="4"/>
+        <g class="st-lines"><rect x="150" y="140" width="260" height="240"/><line x1="150" y1="260" x2="410" y2="260"/><circle cx="280" cy="260" r="32"/><rect x="215" y="140" width="130" height="46"/><rect x="215" y="334" width="130" height="46"/></g></g>
+      ${shapes}
+      <g class="st-compass" transform="translate(30 70)"><path d="M0 22 L0 -6 M-6 2 L0 -6 L6 2"/><text x="0" y="-12" text-anchor="middle">N</text></g>
+    </svg>`;
+    const total = zones.reduce((s, z) => s + (Number(z.capacity) || 0), 0);
+    const panel = `<div class="zone-panel">
+      <span class="tag t">${esc(ZONE_KIND[sel.kind] || sel.kind)}</span>
+      <h3 class="display">${esc(sel.name)}</h3>
+      <div class="zp-cap"><small>Aforo de la zona</small><b>${Number(sel.capacity || 0).toLocaleString('es-ES')}</b> espectadores</div>
+      <div class="prices"><div class="price"><small>Adulto</small><b>${money(sel.price_adult)}</b></div><div class="price"><small>Junior</small><b>${money(sel.price_junior)}</b></div><div class="price"><small>Senior</small><b>${money(sel.price_senior)}</b></div></div>
+      <p>${esc(sel.description || '')}</p>
+      ${adm(`<button data-act="edit-zone" data-id="${sel.slot}">Editar esta zona</button>`)}
+    </div>`;
+    const tiers = [...new Set(zones.map(z => tier(z)))].sort((x, y) => x - y);
+    const legend = tiers.map(t => {
+      const zs = zones.filter(z => tier(z) === t);
+      return `<li><span class="sw" style="background:${TIER_FILL[t]}"></span><b>${zs.map(z => esc(z.name)).join(' · ')}</b> <span class="lp">desde ${esc(money(Math.min(...zs.map(z => Number(z.price_adult) || 0))))}</span></li>`;
+    }).join('');
+    return `<div class="stadium-grid"><div class="stadium-map">${svg}</div>${panel}</div>
+      <ul class="zone-legend" aria-label="Leyenda de precios"><li class="lt">Más barato</li>${legend}<li class="lt">Más caro</li></ul>
+      <p class="zone-note">Precios de adulto por zona (aforo total del plano: ${total.toLocaleString('es-ES')}). Los partidos de categoría alta o baja ajustan estos precios. Las zonas punteadas son para visitantes.</p>`;
+  }
+
   pages.tickets = async () => {
-    const all = await DB.list('tickets', 'event_date', true);
+    const [all, zoneRows] = await Promise.all([DB.list('tickets', 'event_date', true), DB.list('stadium_zones', 'slot', true).catch(() => [])]);
+    zonesState = mergeZones(zoneRows);
+    if (!zonesState.some(z => z.slot === selectedSlot)) selectedSlot = 'main';
     const now = Date.now() - 3 * 3600e3;
     const row = (t) => {
       const d = new Date(t.event_date), past = d.getTime() < now;
@@ -304,7 +371,8 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
         <div class="date"><b>${d.getDate()}</b><span>${MONTHS[d.getMonth()]}</span></div>
         <div class="main"><h3 class="display">Worthing Mariners vs ${esc(t.rival)}</h3>
           <div class="sub">${esc(t.competition || '')} · ${esc(t.venue || 'Harbour Lane')} · ${esc(fmtTime(t.event_date))} h</div>
-          <div class="prices"><div class="price"><small>Adulto</small><b>${money(t.price_adult)}</b></div><div class="price"><small>Junior</small><b>${money(t.price_junior)}</b></div><div class="price"><small>Senior</small><b>${money(t.price_senior)}</b></div></div></div>
+          <div class="prices">${zonesState.map(z => `<div class="price"><small>${esc(z.name)}</small><b>${money(scaled(z.price_adult, priceFactor(t)))}</b></div>`).join('')}</div>
+          <div class="cat-note">Precio de adulto por zona${priceFactor(t) > 1 ? ' · <span class="tag soon">Partido de categoría alta</span>' : priceFactor(t) < 1 ? ' · <span class="tag t">Partido de categoría baja</span>' : ''}</div></div>
         <div class="side">${status}
           <div><span class="big">${Number(t.available || 0).toLocaleString('es-ES')}</span><br>entradas locales disponibles</div>
           <div><b>${Number(t.away_allocation || 0).toLocaleString('es-ES')}</b> para aficionados visitantes</div>
@@ -313,7 +381,10 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
     };
     return pageHead('Tickets', 'Entradas para los partidos en Harbour Lane.', isAdmin ? `<button class="adm-add" data-act="add-ticket">+ Añadir partido con entradas</button>` : '') +
       `<section class="section tight"><div class="wrap">
-        <div class="notice"><b>Club ficticio:</b> la venta es solo informativa, no se realizan cobros reales. La grada <b>The Dock</b> reúne a los aficionados más fieles del Mariners.</div>
+        <div class="notice"><b>Club ficticio:</b> la venta es solo informativa, no se realizan cobros reales.</div>
+        <div class="sec-head"><h2 class="display">Harbour Lane por zonas</h2></div>
+        <div id="stadium">${stadiumInner()}</div>
+        <div class="sec-head" style="margin-top:44px"><h2 class="display">Próximos partidos</h2></div>
         ${all.length ? `<div class="tickets">${all.map(row).join('')}</div>` : `<div class="empty">No hay entradas publicadas todavía.</div>`}
       </div></section>`;
   };
@@ -449,6 +520,10 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
     'edit-news': wrapErr(async (id) => newsForm(await byId('news', 'created_at', id))),
     'del-news': wrapErr(async (id) => { if (!confirmDel('esta publicación')) return; await DB.remove('news', id); toast('Publicación borrada'); if (location.hash.includes('/noticias/')) location.hash = '#/noticias'; else render(); }),
 
+    /* --- estadio --- */
+    'pick-zone': (slot) => { selectedSlot = slot; const el = $('#stadium'); if (el) { el.innerHTML = stadiumInner(); const g = el.querySelector(`g[data-id="${slot}"]`); if (g) g.focus({ preventScroll: true }); } },
+    'edit-zone': wrapErr(async (slot) => zoneForm(zonesState.find(z => z.slot === slot))),
+
     /* --- contacto --- */
     'edit-contact': wrapErr(async () => {
       const cur = { ...DEFAULT_CONTACT, ...(await DB.getContent('contact', DEFAULT_CONTACT)) };
@@ -553,25 +628,47 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
     });
   }
 
+  function zoneForm(z) {
+    if (!z) return;
+    openForm({
+      title: 'Editar zona: ' + z.name,
+      values: z,
+      fields: [
+        { name: 'name', label: 'Nombre de la zona', required: true },
+        { name: 'kind', label: 'Tipo', type: 'select', options: [['asiento', 'Asientos'], ['pie', 'De pie'], ['visitantes', 'Zona de visitantes']] },
+        { name: 'capacity', label: 'Aforo de la zona', type: 'number', min: 0 },
+        { name: 'price_adult', label: 'Precio adulto (£)', type: 'number', min: 0, step: 0.5, required: true },
+        { name: 'price_junior', label: 'Precio junior (£)', type: 'number', min: 0, step: 0.5 },
+        { name: 'price_senior', label: 'Precio senior (£)', type: 'number', min: 0, step: 0.5 },
+        { name: 'description', label: 'Descripción', type: 'textarea', rows: 4 }
+      ],
+      onSubmit: async (v) => {
+        await DB.save('stadium_zones', { ...(z.id ? { id: z.id } : {}), slot: z.slot, name: v.name, kind: v.kind, capacity: v.capacity ?? 0, price_adult: v.price_adult, price_junior: v.price_junior, price_senior: v.price_senior, description: v.description });
+        toast('Zona actualizada'); render();
+      }
+    });
+  }
+
   function ticketForm(t) {
     openForm({
       title: t ? 'Editar entradas' : 'Añadir partido con entradas',
-      values: t || { venue: 'Harbour Lane', competition: 'EFL League Two', on_sale: true, available: 4000, away_allocation: 500, price_adult: 18, price_junior: 6, price_senior: 12 },
+      values: t || { venue: 'Harbour Lane', competition: 'EFL League Two', on_sale: true, available: 4000, away_allocation: 500, price_factor: '1' },
       fields: [
         { name: 'rival', label: 'Rival', required: true },
         { name: 'event_date', label: 'Fecha y hora', type: 'datetime', required: true },
         { name: 'competition', label: 'Competición' },
         { name: 'venue', label: 'Estadio' },
-        { name: 'price_adult', label: 'Precio adulto (£)', type: 'number', min: 0, step: 0.5 },
-        { name: 'price_junior', label: 'Precio junior (£)', type: 'number', min: 0, step: 0.5 },
-        { name: 'price_senior', label: 'Precio senior (£)', type: 'number', min: 0, step: 0.5 },
+        { name: 'price_factor', label: 'Categoría del partido', type: 'select', options: [['1', 'Normal (precios del plano)'], ['1.25', 'Alta: +25 % (partidos importantes)'], ['0.8', 'Baja: −20 %']], hint: 'Los precios base se editan por zona en el plano del estadio (botón «Editar esta zona»).' },
         { name: 'available', label: 'Entradas disponibles (aficionados locales)', type: 'number', min: 0 },
         { name: 'away_allocation', label: 'Entradas destinadas a visitantes', type: 'number', min: 0, hint: 'Harbour Lane tiene capacidad para 4.850 espectadores.' },
         { name: 'on_sale', label: 'Entradas a la venta', type: 'checkbox' }
       ],
       onSubmit: async (v) => {
         if ((v.available || 0) + (v.away_allocation || 0) > 4850) throw new Error('La suma de entradas locales y de visitantes supera el aforo de 4.850.');
-        await DB.save('tickets', { ...(t ? { id: t.id } : {}), rival: v.rival, event_date: v.event_date, competition: v.competition, venue: v.venue, price_adult: v.price_adult, price_junior: v.price_junior, price_senior: v.price_senior, available: v.available ?? 0, away_allocation: v.away_allocation ?? 0, on_sale: v.on_sale });
+        const factor = Number(v.price_factor) || 1;
+        const row = { ...(t ? { id: t.id } : {}), rival: v.rival, event_date: v.event_date, competition: v.competition, venue: v.venue, available: v.available ?? 0, away_allocation: v.away_allocation ?? 0, on_sale: v.on_sale };
+        if (factor !== 1 || (t && t.price_factor != null && Number(t.price_factor) !== 1)) row.price_factor = factor; // solo si la columna ya se usa (evita errores si falta zones.sql)
+        await DB.save('tickets', row);
         toast(t ? 'Entradas actualizadas' : 'Entradas añadidas'); render();
       }
     });
@@ -657,6 +754,9 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
     }
   });
 
+  document.addEventListener('keydown', (e) => {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('g[data-act]')) { e.preventDefault(); e.target.dispatchEvent(new MouseEvent('click', { bubbles: true })); }
+  });
   document.addEventListener('click', (e) => {
     const el = e.target.closest('[data-act]');
     if (el) {

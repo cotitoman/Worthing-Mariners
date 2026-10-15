@@ -272,3 +272,33 @@ dialog.modal::backdrop{background:rgba(6,20,46,.7)}
 .msg-top a{color:var(--turq-d)}
 .msg-top .when{margin-left:auto;color:var(--muted);font-size:13px}
 .msg p{margin:8px 0 10px;overflow-wrap:anywhere}
+
+/* ---------- Mapa del estadio ---------- */
+.stadium-grid{display:grid;grid-template-columns:minmax(0,560px) minmax(0,1fr);gap:32px;align-items:start}
+@media(max-width:900px){.stadium-grid{grid-template-columns:1fr}}
+.stadium-map{background:#fff;box-shadow:0 2px 0 var(--line);padding:8px}
+.stadium-svg{width:100%;height:auto;display:block}
+.st-bg{fill:#eef3f9}
+.st-pitch rect:first-child{fill:#2f7d57}
+.st-lines *{fill:none;stroke:rgba(255,255,255,.85);stroke-width:2}
+.st-compass path{fill:none;stroke:var(--navy);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+.st-compass text{fill:var(--navy);font:700 15px 'Barlow Condensed',Arial,sans-serif}
+.zone{cursor:pointer;outline:none}
+.zone polygon{stroke:#fff;stroke-width:3;stroke-linejoin:round;transition:filter .15s,stroke .15s}
+.zone:hover polygon{filter:brightness(.94);stroke:var(--navy)}
+.zone:focus-visible polygon{stroke:var(--navy);stroke-width:4}
+.zone.sel polygon{stroke:var(--navy);stroke-width:4}
+.zone .zn{font:700 19px 'Barlow Condensed',Arial,sans-serif;text-transform:uppercase;letter-spacing:.04em}
+.zone .zp{font:700 17px 'Barlow Condensed',Arial,sans-serif}
+.zone-panel{background:#fff;padding:22px 24px 24px;box-shadow:0 2px 0 var(--line);border-top:5px solid var(--turq);display:grid;gap:12px;justify-items:start}
+.zone-panel h3{font-size:36px;color:var(--navy)}
+.zone-panel p{margin:0;color:var(--muted)}
+.zp-cap small{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.zp-cap b{font-family:'Barlow Condensed',sans-serif;font-size:30px;color:var(--navy)}
+.zone-legend{list-style:none;margin:18px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:8px 22px;align-items:center;font-size:14px}
+.zone-legend .sw{display:inline-block;width:18px;height:18px;border:2px solid #fff;box-shadow:0 0 0 1px var(--line);vertical-align:-4px;margin-right:6px}
+.zone-legend .lp{color:var(--muted)}
+.zone-legend .lt{font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-size:13px}
+.zone-note{font-size:13px;color:var(--muted);margin:10px 0 0}
+.cat-note{font-size:12.5px;color:var(--muted);margin-top:8px}
+.ticket .price{min-width:96px;padding:6px 12px}

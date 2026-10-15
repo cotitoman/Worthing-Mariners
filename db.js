@@ -23,6 +23,12 @@
     tickets: [
       { id: uid(), event_date: at(6), rival: 'Ashford Rangers', competition: 'EFL League Two', venue: 'Harbour Lane', price_adult: 18, price_junior: 6, price_senior: 12, available: 3900, away_allocation: 600, on_sale: true, created_at: at(-8) }
     ],
+    stadium_zones: [
+      { id: uid(), slot: 'north', name: 'The Dock', kind: 'pie', capacity: 1600, price_adult: 15, price_junior: 5, price_senior: 10, description: 'La grada más ruidosa de Harbour Lane, en el extremo norte. Aquí se concentran los seguidores más apasionados del Mariners, con banderas azul marino y turquesa y cánticos durante todo el partido.', created_at: at(-400) },
+      { id: uid(), slot: 'main', name: 'Main Stand', kind: 'asiento', capacity: 1200, price_adult: 28, price_junior: 10, price_senior: 20, description: 'La grada principal, junto a los vestuarios, la zona de prensa y los espacios de patrocinadores. Asientos cubiertos con la mejor vista del campo.', created_at: at(-400) },
+      { id: uid(), slot: 'opposite', name: 'Family Stand', kind: 'asiento', capacity: 1100, price_adult: 22, price_junior: 7, price_senior: 15, description: 'La tribuna lateral frente a la principal, pensada para familias y aficionados jóvenes. Asientos cubiertos y un ambiente más tranquilo.', created_at: at(-400) },
+      { id: uid(), slot: 'south', name: 'South End', kind: 'visitantes', capacity: 950, price_adult: 16, price_junior: 6, price_senior: 12, description: 'El extremo sur, de pie, reservado a los aficionados visitantes.', created_at: at(-400) }
+    ],
     sponsors: [
       { id: uid(), name: 'Umbro', role: 'Patrocinador técnico oficial', tier: 'principal', sort_order: 10, logo_url: null, website_url: null, created_at: at(-300),
         description: 'Marca deportiva que fabrica las camisetas local, visitante y alternativa, además de la ropa de entrenamiento y parte del equipamiento del club.' },
