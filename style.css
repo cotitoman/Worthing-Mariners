@@ -336,3 +336,15 @@ table.members th{font-size:12px;text-transform:uppercase;letter-spacing:.06em;co
 .was{color:var(--muted);font-weight:400;font-size:.62em;margin-right:4px}
 .notice.member{border-left-color:var(--navy);background:#e4ecf8}
 .notice a{color:inherit}
+
+/* ---------- Redes y compartir ---------- */
+.social-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:10px 0 4px}
+.social-row:empty{display:none}
+.soc{display:inline-flex;width:40px;height:40px;align-items:center;justify-content:center;border-radius:50%;background:rgba(255,255,255,.1);color:#fff;transition:background .15s,color .15s}
+.soc:hover,.soc:focus-visible{background:var(--turq);color:var(--navy)}
+.soc svg{width:20px;height:20px}
+.share{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:28px 0 8px;padding-top:18px;border-top:1px solid var(--line)}
+.share>b{font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;letter-spacing:.06em;color:var(--navy);margin-right:4px}
+.shr{display:inline-flex;gap:7px;align-items:center;padding:8px 14px;background:#fff;color:var(--navy);box-shadow:inset 0 0 0 2px var(--navy);font:600 14px 'Inter',Arial,sans-serif;text-decoration:none;cursor:pointer;border:0}
+.shr:hover,.shr:focus-visible{background:var(--navy);color:#fff}
+.shr svg{width:18px;height:18px}

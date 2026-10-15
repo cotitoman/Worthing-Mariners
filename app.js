@@ -276,6 +276,33 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
       ${list.length ? `<div class="news-grid">${list.map(newsCard).join('')}</div>` : `<div class="empty">No hay publicaciones en esta categoría.</div>`}</div></section>`;
   };
 
+  /* ---------- Redes sociales (pie de página) y compartir ---------- */
+  const ICON = {
+    x: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.9 2H22l-7.2 8.2L23 22h-6.6l-5.2-6.8L5.2 22H2l7.7-8.8L1.5 2h6.7l4.7 6.2L18.9 2zm-1.2 18h1.8L7.3 3.9H5.4L17.7 20z"/></svg>',
+    instagram: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5.5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="17.3" cy="6.7" r="1.3" fill="currentColor"/></svg>',
+    whatsapp: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M12 3a9 9 0 0 0-7.7 13.6L3 21l4.500-1.200A9 9 0 1 0 12 3z"/><path fill="currentColor" d="M9 8c.3 3.600 3 6.400 6.300 6.800l1-1.500-2-1-.8.800c-1-.4-2-1.400-2.400-2.400l.8-.8-1-2z"/></svg>',
+    facebook: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M13.5 22v-8.2h2.8l.4-3.300h-3.200V8.400c0-.9.3-1.600 1.600-1.600h1.700V3.900c-.3 0-1.300-.1-2.500-.1-2.500 0-4.200 1.500-4.200 4.300v2.400H7.300v3.300h2.800V22h3.400z"/></svg>',
+    link: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M10 14a4.500 4.500 0 0 0 6.400 0l3-3a4.500 4.500 0 0 0-6.400-6.400l-1 1M14 10a4.500 4.500 0 0 0-6.400 0l-3 3a4.500 4.500 0 0 0 6.400 6.400l1-1"/></svg>'
+  };
+  const SOCIAL_BASE = { x: 'https://x.com/', instagram: 'https://instagram.com/' };
+  const toSocialUrl = (net, v) => { v = (v || '').trim(); if (!v) return ''; if (/^https?:\/\//i.test(v)) return safeUrl(v) || ''; return SOCIAL_BASE[net] + v.replace(/^@/, '').replace(/[^\w.]/g, ''); };
+  async function renderSocial() {
+    const box = $('#social'); if (!box) return;
+    let s = {}; try { s = await DB.getContent('social', {}) || {}; } catch (e) { /* sin red social */ }
+    const items = [['x', 'X (Twitter)', s.x], ['instagram', 'Instagram', s.instagram]].filter(i => i[2]);
+    box.innerHTML = `<div class="social-row">${items.map(([k, label, v]) => `<a class="soc" href="${esc(toSocialUrl(k, v))}" target="_blank" rel="noopener" aria-label="${label}" title="${label}">${ICON[k]}</a>`).join('')}${isAdmin ? `<button class="adm-add" data-act="edit-social">✎ Editar redes</button>` : ''}</div>`;
+  }
+  function shareUrl(id) { return location.origin + location.pathname + '#/noticias/' + id; }
+  function shareBar(n) {
+    const url = shareUrl(n.id), t = encodeURIComponent(n.title + ' — Worthing Mariners AFC'), u = encodeURIComponent(url);
+    const b = (cls, label, href, icon) => `<a class="shr ${cls}" href="${href}" target="_blank" rel="noopener" aria-label="${label}" title="${label}">${icon}<span>${label}</span></a>`;
+    return `<div class="share"><b>Compartir</b>
+      ${b('wa', 'WhatsApp', 'https://wa.me/?text=' + t + '%20' + u, ICON.whatsapp)}
+      ${b('x', 'X', 'https://twitter.com/intent/tweet?text=' + t + '&url=' + u, ICON.x)}
+      ${b('fb', 'Facebook', 'https://www.facebook.com/sharer/sharer.php?u=' + u, ICON.facebook)}
+      <button class="shr" data-act="copy-link" data-id="${n.id}" aria-label="Copiar enlace" title="Copiar enlace">${ICON.link}<span>Copiar enlace</span></button></div>`;
+  }
+
   pages.article = async (id) => {
     const all = await DB.list('news', 'created_at', false);
     const n = all.find(x => x.id === id);
@@ -289,6 +316,7 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
         ${n.image_url ? `<img class="hero-img" src="${esc(n.image_url)}" alt="">` : ''}
         ${videoEmbed(n.video_url)}
         ${paragraphs(n.body)}
+        ${shareBar(n)}
         ${adm(`<button data-act="edit-news" data-id="${n.id}">Editar</button><button class="del" data-act="del-news" data-id="${n.id}">Borrar</button>`)}
       </article></div>`;
   };
@@ -603,6 +631,14 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
   const wrapErr = (fn) => async (...a) => { try { await fn(...a); } catch (e) { console.error(e); toast(e.message || 'Error', true); } };
 
   const actions = {
+    'copy-link': wrapErr(async (id) => { const url = shareUrl(id); try { await navigator.clipboard.writeText(url); } catch (e) { const t = document.createElement('textarea'); t.value = url; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove(); } toast('Enlace copiado'); }),
+    'edit-social': wrapErr(async () => {
+      const s = (await DB.getContent('social', {})) || {};
+      openForm({ title: 'Redes sociales del club', values: s, fields: [
+        { name: 'x', label: 'X (Twitter)', placeholder: '@WorthingMariners o enlace completo', hint: 'Déjalo vacío para ocultar este icono.' },
+        { name: 'instagram', label: 'Instagram', placeholder: '@worthingmariners o enlace completo' }
+      ], onSubmit: async (v) => { await DB.setContent('social', { x: v.x, instagram: v.instagram }); toast('Redes guardadas'); renderSocial(); } });
+    }),
     login: () => { document.querySelectorAll('dialog.modal').forEach(d => d.close()); openLogin(); },
     signup: () => { document.querySelectorAll('dialog.modal').forEach(d => d.close()); openSignup(); },
     account: () => { location.hash = '#/cuenta'; },
@@ -899,8 +935,8 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
   (async function init() {
     if (DB.wantsRemote && !DB.REMOTE) toast('No se pudo cargar Supabase: revisa tu conexión.', true);
     try { isAdmin = await DB.isAdmin(); me = await DB.user(); } catch (e) { isAdmin = false; me = null; }
-    updateChrome(); await refreshMember();
-    DB.onAuth(async () => { try { isAdmin = await DB.isAdmin(); me = await DB.user(); } catch (e) { isAdmin = false; me = null; } updateChrome(); await refreshMember(); render(); });
+    updateChrome(); await refreshMember(); renderSocial();
+    DB.onAuth(async () => { try { isAdmin = await DB.isAdmin(); me = await DB.user(); } catch (e) { isAdmin = false; me = null; } updateChrome(); await refreshMember(); renderSocial(); render(); });
     render();
   })();
 })();
