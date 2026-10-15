@@ -153,24 +153,50 @@
     async signIn(email, password) {
       if (REMOTE) {
         const { error } = await sb.auth.signInWithPassword({ email, password });
-        if (error) throw new Error('Correo o contraseña incorrectos.');
-        if (!(await DB.isAdmin())) { await sb.auth.signOut(); throw new Error('Esta cuenta no tiene permisos de administrador.'); }
+        if (error) throw new Error(/confirm/i.test(error.message) ? 'Debes confirmar tu correo antes de entrar (revisa tu bandeja).' : 'Correo o contraseña incorrectos.');
         return;
       }
-      if (password !== 'admin') throw new Error('En modo demo la contraseña es "admin".');
-      LS.set('admin', true); listeners.forEach(f => f());
+      if (email === 'demo@local' && password !== 'admin') throw new Error('En modo demo la contraseña de administrador es "admin".');
+      if (password === 'admin' && email === 'demo@local') LS.set('admin', true);
+      else { const u = LS.get('demo_users', []).find(x => x.email === email.toLowerCase() && x.password === password); if (!u) throw new Error('Correo o contraseña incorrectos.'); LS.set('user', { id: u.id, email: u.email, name: u.name }); LS.set('admin', false); }
+      listeners.forEach(f => f());
+    },
+
+    /* Devuelve { needsConfirm } si Supabase exige confirmar el correo. */
+    async signUp(email, password, name) {
+      if (REMOTE) {
+        const { data, error } = await sb.auth.signUp({ email, password, options: { data: { name } } });
+        if (error) throw new Error(/registered|already/i.test(error.message) ? 'Ese correo ya tiene una cuenta.' : /password/i.test(error.message) ? 'La contraseña es muy débil (mínimo 6 caracteres).' : error.message);
+        if (data && data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) throw new Error('Ese correo ya tiene una cuenta.');
+        return { needsConfirm: !(data && data.session) };
+      }
+      email = email.toLowerCase();
+      const users = LS.get('demo_users', []);
+      if (users.some(u => u.email === email)) throw new Error('Ese correo ya tiene una cuenta.');
+      const u = { id: uid(), email, password, name };
+      users.push(u); LS.set('demo_users', users);
+      LS.set('user', { id: u.id, email, name }); LS.set('admin', false); listeners.forEach(f => f());
+      return { needsConfirm: false };
     },
 
     async signOut() {
       if (REMOTE) { await sb.auth.signOut(); return; }
-      LS.set('admin', false); listeners.forEach(f => f());
+      LS.set('admin', false); LS.set('user', null); listeners.forEach(f => f());
+    },
+
+    /* Usuario actual (cualquier cuenta) o null */
+    async user() {
+      if (!REMOTE) { if (LS.get('admin', false)) return { id: 'admin', email: 'demo@local', name: 'Administrador' }; return LS.get('user', null); }
+      const { data } = await sb.auth.getSession();
+      const u = data && data.session && data.session.user;
+      if (!u) return null;
+      return { id: u.id, email: u.email, name: (u.user_metadata && u.user_metadata.name) || (u.email || '').split('@')[0] };
     },
 
     async isAdmin() {
       if (!REMOTE) return !!LS.get('admin', false);
-      const { data } = await sb.auth.getSession();
-      const mail = data && data.session && data.session.user && data.session.user.email;
-      return !!mail && mail.toLowerCase() === adminEmail;
+      const u = await DB.user();
+      return !!u && !!u.email && u.email.toLowerCase() === adminEmail;
     },
 
     onAuth(cb) {

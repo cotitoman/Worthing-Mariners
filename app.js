@@ -4,6 +4,7 @@
   const $ = (s, r = document) => r.querySelector(s);
   const app = $('#app');
   let isAdmin = false;
+  let me = null; // cuenta actual (cualquier usuario) o null
   let newsFilter = 'todas';
   let renderToken = 0;
 
@@ -127,13 +128,30 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
   /* ---------- Login ---------- */
   function openLogin() {
     openForm({
-      title: 'Acceso del club',
+      title: 'Entrar',
       submitLabel: 'Entrar',
       fields: [
-        { name: 'email', label: 'Correo', type: 'email', required: DB.REMOTE, default: DB.REMOTE ? '' : 'demo@local' },
-        { name: 'password', label: 'Contraseña', type: 'password', required: true, hint: DB.REMOTE ? '' : 'Modo demo: la contraseña es <b>admin</b>.' }
+        { name: 'email', label: 'Correo', type: 'email', required: true, default: DB.REMOTE ? '' : '' },
+        { name: 'password', label: 'Contraseña', type: 'password', required: true, hint: (DB.REMOTE ? '' : 'Demo: administrador = <b>demo@local</b> con contraseña <b>admin</b>.<br>') + '¿Aún no tienes cuenta? <button type="button" class="linkbtn" data-act="signup">Crear una cuenta</button>' }
       ],
-      onSubmit: async (v) => { await DB.signIn(v.email, v.password); toast('Sesión de administrador iniciada'); }
+      onSubmit: async (v) => { await DB.signIn(v.email, v.password); toast('Sesión iniciada'); }
+    });
+  }
+  function openSignup() {
+    openForm({
+      title: 'Crear cuenta',
+      submitLabel: 'Registrarme',
+      fields: [
+        { name: 'name', label: 'Nombre', required: true, placeholder: 'Cómo quieres que te llamemos' },
+        { name: 'email', label: 'Correo', type: 'email', required: true },
+        { name: 'password', label: 'Contraseña (mínimo 6 caracteres)', type: 'password', required: true, hint: '¿Ya tienes cuenta? <button type="button" class="linkbtn" data-act="login">Entrar</button>' }
+      ],
+      onSubmit: async (v) => {
+        if (v.password.length < 6) throw new Error('La contraseña debe tener al menos 6 caracteres.');
+        const r = await DB.signUp(v.email, v.password, v.name);
+        toast(r.needsConfirm ? 'Cuenta creada: revisa tu correo para confirmarla.' : '¡Bienvenido al Mariners!');
+        if (!r.needsConfirm) location.hash = '#/cuenta';
+      }
     });
   }
 
@@ -147,8 +165,8 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
     bar.className = !DB.REMOTE ? 'demo' : '';
     bar.innerHTML = html;
     const lb = $('#loginBtn');
-    lb.textContent = isAdmin ? 'Cerrar sesión' : 'Acceso club';
-    lb.dataset.act = isAdmin ? 'logout' : 'login';
+    lb.textContent = isAdmin ? 'Cerrar sesión' : me ? 'Mi cuenta' : 'Entrar';
+    lb.dataset.act = isAdmin ? 'logout' : me ? 'account' : 'login';
   }
 
   /* ---------- tarjetas de partido ---------- */
@@ -418,6 +436,16 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
   const SUBJECT_LABEL = Object.fromEntries(SUBJECTS);
   const DEFAULT_CONTACT = { email: '', text: '¿Quieres colaborar con el Worthing Mariners, proponernos una idea o simplemente escribirnos? Déjanos un mensaje y el club te responderá. Somos un club de su gente: tu voz cuenta.' };
 
+  pages.cuenta = async () => {
+    if (!me) return pageHead('Mi cuenta', 'Entra para ver tu cuenta.', '') + `<section class="sec"><div class="wrap"><p>Necesitas una cuenta para ver esta página.</p><button class="btn" data-act="login">Entrar</button> <button class="btn ghost" data-act="signup">Crear cuenta</button></div></section>`;
+    return pageHead('Mi cuenta', 'Tu perfil en el Worthing Mariners.', '') + `<section class="sec"><div class="wrap"><div class="acct">
+      <span class="tag t">${isAdmin ? 'Administrador' : 'Aficionado'}</span>
+      <h2 class="display">${esc(me.name)}</h2>
+      <p class="acct-mail">${esc(me.email)}</p>
+      <p>${isAdmin ? 'Tienes control total del sitio.' : 'Todavía no eres socio del club. Muy pronto podrás elegir un plan de socio y conseguir entradas más baratas y regalos.'}</p>
+      <button class="btn ghost sm" data-act="logout">Cerrar sesión</button></div></div></section>`;
+  };
+
   pages.contacto = async () => {
     const info = { ...DEFAULT_CONTACT, ...(await DB.getContent('contact', DEFAULT_CONTACT).catch(() => DEFAULT_CONTACT)) };
     let inbox = '';
@@ -496,8 +524,10 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
   const wrapErr = (fn) => async (...a) => { try { await fn(...a); } catch (e) { console.error(e); toast(e.message || 'Error', true); } };
 
   const actions = {
-    login: openLogin,
-    logout: wrapErr(async () => { await DB.signOut(); isAdmin = false; updateChrome(); toast('Sesión cerrada'); render(); }),
+    login: () => { document.querySelectorAll('dialog.modal').forEach(d => d.close()); openLogin(); },
+    signup: () => { document.querySelectorAll('dialog.modal').forEach(d => d.close()); openSignup(); },
+    account: () => { location.hash = '#/cuenta'; },
+    logout: wrapErr(async () => { await DB.signOut(); isAdmin = false; me = null; updateChrome(); if (location.hash === '#/cuenta') location.hash = '#/'; toast('Sesión cerrada'); render(); }),
     filter: (id) => { newsFilter = id; render(); },
 
     /* --- plantilla --- */
@@ -771,9 +801,9 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
   /* ---------- Arranque ---------- */
   (async function init() {
     if (DB.wantsRemote && !DB.REMOTE) toast('No se pudo cargar Supabase: revisa tu conexión.', true);
-    try { isAdmin = await DB.isAdmin(); } catch (e) { isAdmin = false; }
+    try { isAdmin = await DB.isAdmin(); me = await DB.user(); } catch (e) { isAdmin = false; me = null; }
     updateChrome();
-    DB.onAuth(async () => { isAdmin = await DB.isAdmin(); updateChrome(); render(); });
+    DB.onAuth(async () => { try { isAdmin = await DB.isAdmin(); me = await DB.user(); } catch (e) { isAdmin = false; me = null; } updateChrome(); render(); });
     render();
   })();
 })();

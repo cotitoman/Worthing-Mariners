@@ -302,3 +302,8 @@ dialog.modal::backdrop{background:rgba(6,20,46,.7)}
 .zone-note{font-size:13px;color:var(--muted);margin:10px 0 0}
 .cat-note{font-size:12.5px;color:var(--muted);margin-top:8px}
 .ticket .price{min-width:96px;padding:6px 12px}
+
+.linkbtn{background:none;border:0;padding:0;color:var(--turq-d,#0f9ea1);font:inherit;text-decoration:underline;cursor:pointer}
+.acct{max-width:560px;background:#fff;padding:28px;box-shadow:0 2px 0 var(--line);border-top:5px solid var(--turq);display:grid;gap:10px;justify-items:start}
+.acct h2{font-size:38px;color:var(--navy)}
+.acct-mail{color:var(--muted);margin:0}
