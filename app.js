@@ -328,6 +328,40 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
       <button class="shr" data-act="copy-link" data-id="${n.id}" aria-label="Copiar enlace" title="Copiar enlace">${ICON.link}<span>Copiar enlace</span></button></div>`;
   }
 
+  /* ---------- Reacciones y comentarios ---------- */
+  const REACTIONS = [['👍', 'Me gusta'], ['⚽', 'Golazo'], ['❤️', 'Orgullo'], ['😮', 'Sorpresa']];
+  let lastComment = 0;
+  async function loadEngage(newsId) {
+    const box = $('#engage'); if (!box || box.dataset.news !== newsId) return;
+    let reacts = [], comments = [], off = false;
+    try { [reacts, comments] = await Promise.all([DB.listWhere('news_reactions', 'news_id', newsId, 'created_at'), DB.listWhere('news_comments', 'news_id', newsId, 'created_at')]); }
+    catch (e) { off = true; }
+    if (!$('#engage') || $('#engage').dataset.news !== newsId) return;
+    if (off) { $('#reactions').innerHTML = ''; $('#thread').innerHTML = isAdmin ? `<div class="empty">Falta ejecutar <b>comments.sql</b> en Supabase para activar los comentarios.</div>` : ''; return; }
+    const mine = me ? new Set(reacts.filter(r => r.user_id === me.id).map(r => r.emoji)) : new Set();
+    $('#reactions').innerHTML = REACTIONS.map(([e, label]) => {
+      const n = reacts.filter(r => r.emoji === e).length;
+      return `<button class="react ${mine.has(e) ? 'on' : ''}" data-act="react" data-id="${e}" aria-pressed="${mine.has(e)}" title="${label}"><span>${e}</span><b>${n || ''}</b><small>${label}</small></button>`;
+    }).join('');
+    const form = me
+      ? `<form id="commentForm" class="comment-form"><label for="cBody">Escribe un comentario</label><textarea id="cBody" name="body" rows="3" maxlength="1000" placeholder="Comparte tu opinión con otros aficionados…"></textarea><p class="form-err" role="alert"></p><button class="btn sm" type="submit">Publicar comentario</button></form>`
+      : `<div class="notice"><button class="linkbtn" data-act="login">Entra</button> o <button class="linkbtn" data-act="signup">crea una cuenta</button> para comentar y reaccionar.</div>`;
+    $('#thread').innerHTML = `<h2 class="display">Comentarios <span class="count">${comments.length}</span></h2>${form}
+      <ul class="comments">${comments.map(c => `<li class="comment"><div class="c-head"><b>${esc(c.author_name || 'Aficionado')}</b><small>${esc(fmtShort(c.created_at))}</small>${(isAdmin || (me && c.user_id === me.id)) ? `<button class="c-del" data-act="del-comment" data-id="${c.id}" aria-label="Borrar comentario">Borrar</button>` : ''}</div><p>${esc(c.body).replace(/\n/g, '<br>')}</p></li>`).join('')}</ul>
+      ${comments.length ? '' : '<p class="no-comments">Todavía no hay comentarios. ¡Sé el primero!</p>'}`;
+  }
+  document.addEventListener('submit', async (e) => {
+    const form = e.target.closest('#commentForm'); if (!form) return;
+    e.preventDefault();
+    const err = $('.form-err', form), btn = $('button[type=submit]', form), newsId = $('#engage').dataset.news;
+    const body = (new FormData(form).get('body') || '').trim();
+    if (!body) { err.textContent = 'Escribe algo antes de publicar.'; return; }
+    if (Date.now() - lastComment < 15000) { err.textContent = 'Espera unos segundos antes de publicar otro comentario.'; return; }
+    btn.disabled = true;
+    try { await DB.addComment(newsId, body); lastComment = Date.now(); toast('Comentario publicado'); await loadEngage(newsId); }
+    catch (ex) { console.error(ex); err.textContent = 'No se pudo publicar: ' + (ex.message || ex); btn.disabled = false; }
+  });
+
   pages.article = async (id) => {
     const all = await DB.list('news', 'created_at', false);
     const n = all.find(x => x.id === id);
@@ -342,6 +376,7 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
         ${videoEmbed(n.video_url)}
         ${paragraphs(n.body)}
         ${shareBar(n)}
+        <section class="engage" id="engage" data-news="${n.id}"><div id="reactions" class="reactions"></div><div id="thread"></div></section>
         ${adm(`<button data-act="edit-news" data-id="${n.id}">Editar</button><button class="del" data-act="del-news" data-id="${n.id}">Borrar</button>`)}
       </article></div>`;
   };
@@ -708,6 +743,7 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
     if (token !== renderToken) return;
     app.innerHTML = html;
     app.removeAttribute('aria-busy');
+    if (seg === 'noticias' && arg) loadEngage(arg);
     document.querySelectorAll('nav [data-nav]').forEach(a => a.classList.toggle('on', a.dataset.nav === seg));
     $('#nav').classList.remove('open'); $('#burger').setAttribute('aria-expanded', 'false');
   }
@@ -728,6 +764,13 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
     'add-photo': () => photoForm(),
     'edit-photo': wrapErr(async (id) => photoForm(await byId('gallery_photos', 'created_at', id))),
     'del-photo': wrapErr(async (id) => { if (!confirmDel('esta foto')) return; await DB.remove('gallery_photos', id); toast('Foto borrada'); render(); }),
+    react: wrapErr(async (emoji) => {
+      if (!me) { toast('Entra o crea una cuenta para reaccionar.'); openLogin(); return; }
+      const box = $('#engage'); if (!box) return;
+      const btn = box.querySelector(`.react[data-id="${emoji}"]`), on = !(btn && btn.classList.contains('on'));
+      await DB.setReaction(box.dataset.news, emoji, on); await loadEngage(box.dataset.news);
+    }),
+    'del-comment': wrapErr(async (id) => { if (!confirmDel('este comentario')) return; await DB.remove('news_comments', id); toast('Comentario borrado'); const b = $('#engage'); if (b) await loadEngage(b.dataset.news); }),
     'copy-link': wrapErr(async (id) => { const url = shareUrl(id); try { await navigator.clipboard.writeText(url); } catch (e) { const t = document.createElement('textarea'); t.value = url; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove(); } toast('Enlace copiado'); }),
     'edit-social': wrapErr(async () => {
       const s = (await DB.getContent('social', {})) || {};

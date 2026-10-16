@@ -135,6 +135,14 @@
     'Todavía no hay fotos en esta categoría.': 'There are no photos in this category yet.', 'Ver foto': 'View photo',
     'Foto anterior': 'Previous photo', 'Foto siguiente': 'Next photo',
     'Esta sección aún no está activada en la base de datos.': 'This section has not been enabled in the database yet.',
+    /* comentarios y reacciones */
+    'Me gusta': 'Like', 'Golazo': 'Great goal', 'Orgullo': 'Pride', 'Sorpresa': 'Surprise',
+    'Comentarios': 'Comments', 'Escribe un comentario': 'Write a comment', 'Comparte tu opinión con otros aficionados…': 'Share your opinion with other fans…',
+    'Publicar comentario': 'Post comment', 'Borrar': 'Delete', 'Borrar comentario': 'Delete comment', 'Comentario publicado': 'Comment posted', 'Comentario borrado': 'Comment deleted',
+    'Entra': 'Log in', 'crea una cuenta': 'create an account', 'para comentar y reaccionar.': 'to comment and react.', 'Entra o crea una cuenta para reaccionar.': 'Log in or create an account to react.',
+    'Todavía no hay comentarios. ¡Sé el primero!': 'No comments yet. Be the first!', 'Escribe algo antes de publicar.': 'Write something before posting.',
+    'Espera unos segundos antes de publicar otro comentario.': 'Wait a few seconds before posting another comment.', 'Aficionado': 'Supporter',
+    'Demasiados comentarios seguidos. Inténtalo más tarde.': 'Too many comments in a row. Please try again later.',
     /* errores generales */
     'No se pudo cargar esta sección.': 'This section could not be loaded.', 'No se pudo cargar Supabase: revisa tu conexión.': 'Could not load Supabase: check your connection.',
     'Ups': 'Oops', 'No encontrada': 'Not found'
@@ -152,6 +160,7 @@
     [/^¡Ya eres socio (.+)!$/, (m) => 'You are now a ' + m[1] + ' member!'],
     [/^¡Gracias, (.+)!$/, (m) => 'Thank you, ' + m[1] + '!'],
     [/^No se pudo guardar: (.+)$/, (m, tr) => 'Could not save: ' + tr(m[1])],
+    [/^No se pudo publicar: (.+)$/, (m, tr) => 'Could not post: ' + tr(m[1])],
     [/^Falta rellenar: (.+)\.$/, (m, tr) => 'Missing: ' + tr(m[1]) + '.'],
     [/^(\d+) h$/, (m) => m[1] + ' h']
   ];

@@ -255,6 +255,35 @@
       return LS.get('demo_users', []).map(x => ({ id: x.id, email: x.email, name: x.name, membership: localRows('memberships').find(y => y.user_id === x.id) || null }));
     },
 
+    /* ---------- Comentarios y reacciones ---------- */
+    async listWhere(table, col, val, orderBy, asc = true) {
+      if (REMOTE) {
+        const { data, error } = await sb.from(table).select('*').eq(col, val).order(orderBy, { ascending: asc });
+        if (error) throw error; return data || [];
+      }
+      const rows = localRows(table).filter(r => r[col] === val);
+      rows.sort((a, b) => (a[orderBy] > b[orderBy] ? 1 : a[orderBy] < b[orderBy] ? -1 : 0) * (asc ? 1 : -1));
+      return rows;
+    },
+    async addComment(newsId, body) {
+      if (REMOTE) { const { error } = await sb.from('news_comments').insert({ news_id: newsId, body }); if (error) throw error; return; }
+      const u = await DB.user(); if (!u) throw new Error('Debes iniciar sesión.');
+      const rows = localRows('news_comments');
+      rows.push({ id: uid(), news_id: newsId, user_id: u.id, author_name: u.name || 'Aficionado', body, created_at: new Date().toISOString() });
+      LS.set('news_comments', rows);
+    },
+    async setReaction(newsId, emoji, on) {
+      if (REMOTE) {
+        if (on) { const { error } = await sb.from('news_reactions').insert({ news_id: newsId, emoji }); if (error && error.code !== '23505') throw error; }
+        else { const u = await DB.user(); const { error } = await sb.from('news_reactions').delete().eq('news_id', newsId).eq('emoji', emoji).eq('user_id', u.id); if (error) throw error; }
+        return;
+      }
+      const u = await DB.user(); if (!u) throw new Error('Debes iniciar sesión.');
+      let rows = localRows('news_reactions').filter(r => !(r.news_id === newsId && r.emoji === emoji && r.user_id === u.id));
+      if (on) rows.push({ id: uid(), news_id: newsId, emoji, user_id: u.id, created_at: new Date().toISOString() });
+      LS.set('news_reactions', rows);
+    },
+
     onAuth(cb) {
       listeners.push(cb);
       if (REMOTE) sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_IN' || ev === 'SIGNED_OUT') cb(); });
