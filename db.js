@@ -34,6 +34,11 @@
       { id: uid(), name: 'Mariner', price: 60, discount_pct: 20, shirt: 'camiseta', perks: 'Carnet digital de socio\nPrioridad de compra de entradas\nNoticias exclusivas para socios', highlight: true, sort_order: 20, created_at: at(-300) },
       { id: uid(), name: "Captain's Club", price: 150, discount_pct: 30, shirt: 'firmada', perks: 'Carnet digital de socio\nPrioridad de compra de entradas\nGrada Main Stand reservada\nVisita al Michael Callahan Training Centre', highlight: false, sort_order: 30, created_at: at(-300) }
     ],
+    gallery_photos: [
+      { id: uid(), image_url: 'estadio.jpg', caption: 'Harbour Lane, el hogar del Mariners', category: 'estadio', created_at: at(-3) },
+      { id: uid(), image_url: 'centro-callahan.jpg', caption: 'Michael Callahan Training Centre', category: 'entrenamientos', created_at: at(-4) },
+      { id: uid(), image_url: 'new-gen.jpg', caption: 'New Gen Training Centre, la academia', category: 'entrenamientos', created_at: at(-5) }
+    ],
     sponsors: [
       { id: uid(), name: 'Umbro', role: 'Patrocinador técnico oficial', tier: 'principal', sort_order: 10, logo_url: null, website_url: null, created_at: at(-300),
         description: 'Marca deportiva que fabrica las camisetas local, visitante y alternativa, además de la ropa de entrenamiento y parte del equipamiento del club.' },

@@ -129,6 +129,12 @@
     '¡Gracias!': 'Thank you!', 'Hemos recibido tu mensaje.': 'We have received your message.',
     'Hemos recibido tu mensaje y el club te responderá pronto.': 'We have received your message and the club will reply soon.',
 
+    /* galería */
+    'Galería': 'Gallery', 'Fotos del Worthing Mariners: partidos, entrenamientos, jugadores y mucho más.': 'Worthing Mariners photos: matches, training, players and much more.',
+    'Entrenamientos': 'Training', 'Jugadores': 'Players', 'Estadio': 'Stadium', 'Aficionados': 'Fans', 'Otros': 'Other',
+    'Todavía no hay fotos en esta categoría.': 'There are no photos in this category yet.', 'Ver foto': 'View photo',
+    'Foto anterior': 'Previous photo', 'Foto siguiente': 'Next photo',
+    'Esta sección aún no está activada en la base de datos.': 'This section has not been enabled in the database yet.',
     /* errores generales */
     'No se pudo cargar esta sección.': 'This section could not be loaded.', 'No se pudo cargar Supabase: revisa tu conexión.': 'Could not load Supabase: check your connection.',
     'Ups': 'Oops', 'No encontrada': 'Not found'

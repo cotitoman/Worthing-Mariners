@@ -89,7 +89,7 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
         case 'textarea': input = `<textarea id="${id}" name="${f.name}" rows="${f.rows || 5}" placeholder="${esc(f.placeholder || '')}">${esc(v)}</textarea>`; break;
         case 'select': input = `<select id="${id}" name="${f.name}">${f.options.map(o => { const [val, lab] = Array.isArray(o) ? o : [o, o]; return `<option value="${esc(val)}" ${String(val) === String(v) ? 'selected' : ''}>${esc(lab)}</option>`; }).join('')}</select>`; break;
         case 'checkbox': return `<div class="field"><label class="chk"><input type="checkbox" id="${id}" name="${f.name}" ${v === true || v === 'true' ? 'checked' : ''}> ${esc(f.label)}</label>${f.hint ? `<small>${esc(f.hint)}</small>` : ''}</div>`;
-        case 'image': input = `${v ? `<div class="cur"><img src="${esc(v)}" alt=""><label class="chk"><input type="checkbox" name="${f.name}__remove"> Quitar imagen actual</label></div>` : ''}<input type="file" id="${id}" name="${f.name}" accept="image/*">`; break;
+        case 'image': input = `${v ? `<div class="cur"><img src="${esc(v)}" alt=""><label class="chk"><input type="checkbox" name="${f.name}__remove"> Quitar imagen actual</label></div>` : ''}<input type="file" id="${id}" name="${f.name}" accept="image/*" ${f.multiple ? 'multiple' : ''}>`; break;
         case 'video': input = `<input type="file" id="${id}" name="${f.name}" accept="video/*" ${DB.REMOTE ? '' : 'disabled'}>`; break;
         case 'datetime': input = `<input type="datetime-local" id="${id}" name="${f.name}" value="${esc(toLocalInput(v))}">`; break;
         case 'number': input = `<input type="number" id="${id}" name="${f.name}" value="${esc(v)}" min="${f.min != null ? f.min : ''}" max="${f.max != null ? f.max : ''}" step="${f.step || 1}">`; break;
@@ -113,6 +113,7 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
       for (const f of fields) {
         const el = form.elements[f.name];
         if (f.type === 'checkbox') out[f.name] = el.checked;
+        else if (f.type === 'image' && f.multiple) { out[f.name] = Array.from(el.files || []); if (f.required && !out[f.name].length) { err.textContent = `Falta rellenar: ${f.label}.`; el.focus(); return; } continue; }
         else if (f.type === 'image' || f.type === 'video') { out[f.name] = (el.files && el.files[0]) || null; if (f.type === 'image') out[f.name + '__remove'] = !!(form.elements[f.name + '__remove'] && form.elements[f.name + '__remove'].checked); }
         else if (f.type === 'number') out[f.name] = el.value === '' ? null : Number(el.value);
         else if (f.type === 'datetime') out[f.name] = el.value ? new Date(el.value).toISOString() : null;
@@ -577,6 +578,69 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
     });
   }
 
+  /* ---------- Galería ---------- */
+  const GAL_CATS = [['partidos', 'Partidos'], ['entrenamientos', 'Entrenamientos'], ['jugadores', 'Jugadores'], ['estadio', 'Estadio'], ['aficionados', 'Aficionados'], ['otros', 'Otros']];
+  let galFilter = 'todas', galList = [], lbIndex = 0;
+  pages.galeria = async () => {
+    let all;
+    try { all = await DB.list('gallery_photos', 'created_at', false); }
+    catch (e) { return pageHead('Galería', '') + `<div class="wrap section"><div class="empty">Esta sección aún no está activada en la base de datos.<br><small>Falta ejecutar <b>gallery.sql</b> en Supabase (SQL Editor).</small></div></div>`; }
+    const used = new Set(all.map(p => p.category));
+    if (galFilter !== 'todas' && !used.has(galFilter)) galFilter = 'todas';
+    galList = galFilter === 'todas' ? all : all.filter(p => p.category === galFilter);
+    const chip = (k, l) => `<a href="javascript:void 0" class="${galFilter === k ? 'on' : ''}" data-act="gal-filter" data-id="${k}">${l}</a>`;
+    const catLabel = (k) => (GAL_CATS.find(c => c[0] === k) || [0, k])[1];
+    return pageHead('Galería', 'Fotos del Worthing Mariners: partidos, entrenamientos, jugadores y mucho más.', isAdmin ? `<button class="adm-add" data-act="add-photo">+ Subir fotos</button>` : '') +
+      `<section class="section tight"><div class="wrap">
+        <div class="chips">${chip('todas', 'Todas')}${GAL_CATS.filter(c => used.has(c[0])).map(c => chip(c[0], c[1])).join('')}</div>
+        ${galList.length ? `<div class="photos">${galList.map((p, i) => `<figure class="photo">
+          <button class="ph-open" data-act="open-photo" data-id="${i}" aria-label="${esc(p.caption || 'Ver foto')}"><img src="${esc(p.image_url)}" alt="${esc(p.caption || '')}" loading="lazy"></button>
+          <figcaption><span>${esc(p.caption || '')}</span><small>${esc(catLabel(p.category))}</small>${adm(`<button data-act="edit-photo" data-id="${p.id}">Editar</button><button class="del" data-act="del-photo" data-id="${p.id}">Borrar</button>`)}</figcaption></figure>`).join('')}</div>` : `<div class="empty">Todavía no hay fotos en esta categoría.</div>`}
+      </div></section>`;
+  };
+
+  function showPhoto(i) {
+    if (!galList.length) return;
+    lbIndex = (i + galList.length) % galList.length;
+    const p = galList[lbIndex];
+    let dlg = document.querySelector('dialog.lightbox');
+    if (!dlg) {
+      dlg = document.createElement('dialog'); dlg.className = 'lightbox';
+      dlg.addEventListener('click', (e) => { if (e.target === dlg || e.target.hasAttribute('data-lb-close')) dlg.close(); });
+      dlg.addEventListener('close', () => dlg.remove());
+      document.body.appendChild(dlg);
+    }
+    dlg.innerHTML = `<button class="lb-x" data-lb-close aria-label="Cerrar">×</button>
+      ${galList.length > 1 ? `<button class="lb-nav prev" data-act="lb-prev" aria-label="Foto anterior">‹</button><button class="lb-nav next" data-act="lb-next" aria-label="Foto siguiente">›</button>` : ''}
+      <figure><img src="${esc(p.image_url)}" alt="${esc(p.caption || '')}"><figcaption>${esc(p.caption || '')}<small>${lbIndex + 1} / ${galList.length}</small></figcaption></figure>`;
+    if (!dlg.open) dlg.showModal();
+  }
+
+  function photoForm(p) {
+    openForm({
+      title: p ? 'Editar foto' : 'Subir fotos',
+      values: p || { category: 'partidos' },
+      submitLabel: p ? 'Guardar' : 'Subir',
+      fields: [
+        p ? { name: 'image_url', label: 'Foto', type: 'image', required: false }
+          : { name: 'files', label: 'Fotos (puedes elegir varias a la vez)', type: 'image', multiple: true, required: true },
+        { name: 'category', label: 'Categoría', type: 'select', options: GAL_CATS },
+        { name: 'caption', label: p ? 'Pie de foto' : 'Pie de foto (se pondrá igual a todas; luego puedes editar cada una)', placeholder: 'Ej: Victoria 2–1 contra Millbrook Town' }
+      ],
+      onSubmit: async (v) => {
+        if (p) {
+          const url = await resolveImage(v, 'image_url', p.image_url, 'galeria');
+          await DB.save('gallery_photos', { id: p.id, image_url: url || p.image_url, caption: v.caption, category: v.category });
+          toast('Foto actualizada');
+        } else {
+          for (const f of v.files) { const url = await DB.upload(f, 'galeria'); await DB.save('gallery_photos', { image_url: url, caption: v.caption, category: v.category }); }
+          toast(v.files.length > 1 ? v.files.length + ' fotos subidas' : 'Foto subida');
+        }
+        render();
+      }
+    });
+  }
+
   pages.contacto = async () => {
     const info = { ...DEFAULT_CONTACT, ...(await DB.getContent('contact', DEFAULT_CONTACT).catch(() => DEFAULT_CONTACT)) };
     let inbox = '';
@@ -657,6 +721,13 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
   const actions = {
     ics: wrapErr(async (id) => { const m = (await DB.list('matches', 'match_date', true)).find(x => x.id === id); if (!m) return; downloadIcs([m], 'mariners-' + m.rival.toLowerCase().replace(/[^a-z0-9]+/g, '-')); toast('Archivo de calendario descargado'); }),
     'ics-all': wrapErr(async () => { const l = (await DB.list('matches', 'match_date', true)).filter(m => !m.played); if (!l.length) return; downloadIcs(l, 'worthing-mariners-partidos'); toast('Calendario descargado: ábrelo para añadirlo'); }),
+    'gal-filter': (id) => { galFilter = id; render(); },
+    'open-photo': (i) => showPhoto(Number(i)),
+    'lb-prev': () => showPhoto(lbIndex - 1),
+    'lb-next': () => showPhoto(lbIndex + 1),
+    'add-photo': () => photoForm(),
+    'edit-photo': wrapErr(async (id) => photoForm(await byId('gallery_photos', 'created_at', id))),
+    'del-photo': wrapErr(async (id) => { if (!confirmDel('esta foto')) return; await DB.remove('gallery_photos', id); toast('Foto borrada'); render(); }),
     'copy-link': wrapErr(async (id) => { const url = shareUrl(id); try { await navigator.clipboard.writeText(url); } catch (e) { const t = document.createElement('textarea'); t.value = url; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove(); } toast('Enlace copiado'); }),
     'edit-social': wrapErr(async () => {
       const s = (await DB.getContent('social', {})) || {};
@@ -944,6 +1015,7 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
   });
 
   document.addEventListener('keydown', (e) => {
+    if (document.querySelector('dialog.lightbox[open]')) { if (e.key === 'ArrowLeft') showPhoto(lbIndex - 1); else if (e.key === 'ArrowRight') showPhoto(lbIndex + 1); }
     if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('g[data-act]')) { e.preventDefault(); e.target.dispatchEvent(new MouseEvent('click', { bubbles: true })); }
   });
   document.addEventListener('click', (e) => {
