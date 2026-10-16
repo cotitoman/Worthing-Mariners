@@ -11,9 +11,10 @@
 
   /* ---------- utilidades ---------- */
   const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const MONTHS = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'];
-  const fmtLong = (iso) => new Date(iso).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-  const fmtShort = (iso) => new Date(iso).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
+  const LOC = () => (window.I18N ? I18N.locale() : 'es-ES');
+  const monthShort = (d) => d.toLocaleDateString(LOC(), { month: 'short' }).replace('.', '').toUpperCase();
+  const fmtLong = (iso) => new Date(iso).toLocaleDateString(LOC(), { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const fmtShort = (iso) => new Date(iso).toLocaleDateString(LOC(), { day: 'numeric', month: 'short', year: 'numeric' });
   const memberPrice = (n) => Math.round(Number(n || 0) * (1 - myDisc / 100) * 100) / 100;
   const priceHtml = (n) => myDisc > 0 ? `<s class="was">${money(n)}</s> ${money(memberPrice(n))}` : money(n);
   async function refreshMember() {
@@ -21,8 +22,8 @@
     try { const m = me ? await DB.myMembership() : null; if (m && new Date(m.expires_at) > new Date()) myDisc = Number(m.discount_pct) || 0; } catch (e) { /* sin membresía */ }
     const lb = $('#loginBtn'); if (lb && me && !isAdmin) lb.textContent = myDisc > 0 ? 'Socio ★' : 'Mi cuenta';
   }
-  const fmtTime = (iso) => new Date(iso).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-  const money = (n) => (n == null || n === '') ? '—' : '£' + Number(n).toLocaleString('es-ES', { minimumFractionDigits: Number(n) % 1 ? 2 : 0 });
+  const fmtTime = (iso) => new Date(iso).toLocaleTimeString(LOC(), { hour: '2-digit', minute: '2-digit' });
+  const money = (n) => (n == null || n === '') ? '—' : '£' + Number(n).toLocaleString(LOC(), { minimumFractionDigits: Number(n) % 1 ? 2 : 0 });
   const toLocalInput = (iso) => { if (!iso) return ''; const d = new Date(iso); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
   const initials = (n) => String(n || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
   const paragraphs = (t) => String(t || '').split(/\n{2,}/).map(p => `<p>${esc(p.trim()).replace(/\n/g, '<br>')}</p>`).join('');
@@ -421,7 +422,7 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
     const panel = `<div class="zone-panel">
       <span class="tag t">${esc(ZONE_KIND[sel.kind] || sel.kind)}</span>
       <h3 class="display">${esc(sel.name)}</h3>
-      <div class="zp-cap"><small>Aforo de la zona</small><b>${Number(sel.capacity || 0).toLocaleString('es-ES')}</b> espectadores</div>
+      <div class="zp-cap"><small>Aforo de la zona</small><b>${Number(sel.capacity || 0).toLocaleString(LOC())}</b> espectadores</div>
       <div class="prices"><div class="price"><small>Adulto</small><b>${priceHtml(sel.price_adult)}</b></div><div class="price"><small>Junior</small><b>${priceHtml(sel.price_junior)}</b></div><div class="price"><small>Senior</small><b>${priceHtml(sel.price_senior)}</b></div></div>
       <p>${esc(sel.description || '')}</p>
       ${adm(`<button data-act="edit-zone" data-id="${sel.slot}">Editar esta zona</button>`)}
@@ -433,7 +434,7 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
     }).join('');
     return `<div class="stadium-grid"><div class="stadium-map">${svg}</div>${panel}</div>
       <ul class="zone-legend" aria-label="Leyenda de precios"><li class="lt">Más barato</li>${legend}<li class="lt">Más caro</li></ul>
-      <p class="zone-note">Precios de adulto por zona (aforo total del plano: ${total.toLocaleString('es-ES')}). Los partidos de categoría alta o baja ajustan estos precios. Las zonas punteadas son para visitantes.</p>`;
+      <p class="zone-note">Precios de adulto por zona (aforo total del plano: ${total.toLocaleString(LOC())}). Los partidos de categoría alta o baja ajustan estos precios. Las zonas punteadas son para visitantes.</p>`;
   }
 
   pages.tickets = async () => {
@@ -446,14 +447,14 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
       const d = new Date(t.event_date), past = d.getTime() < now;
       const status = past ? '<span class="tag off">Finalizado</span>' : !t.on_sale ? '<span class="tag soon">Próximamente</span>' : t.available <= 0 ? '<span class="tag out">Agotado</span>' : '<span class="tag on">A la venta</span>';
       return `<article class="ticket ${past ? 'past' : ''}">
-        <div class="date"><b>${d.getDate()}</b><span>${MONTHS[d.getMonth()]}</span></div>
+        <div class="date"><b>${d.getDate()}</b><span>${monthShort(d)}</span></div>
         <div class="main"><h3 class="display">Worthing Mariners vs ${esc(t.rival)}</h3>
           <div class="sub">${esc(t.competition || '')} · ${esc(t.venue || 'Harbour Lane')} · ${esc(fmtTime(t.event_date))} h</div>
           <div class="prices">${zonesState.map(z => `<div class="price"><small>${esc(z.name)}</small><b>${priceHtml(scaled(z.price_adult, priceFactor(t)))}</b></div>`).join('')}</div>
           <div class="cat-note">Precio de adulto por zona${priceFactor(t) > 1 ? ' · <span class="tag soon">Partido de categoría alta</span>' : priceFactor(t) < 1 ? ' · <span class="tag t">Partido de categoría baja</span>' : ''}</div></div>
         <div class="side">${status}
-          <div><span class="big">${Number(t.available || 0).toLocaleString('es-ES')}</span><br>entradas locales disponibles</div>
-          <div><b>${Number(t.away_allocation || 0).toLocaleString('es-ES')}</b> para aficionados visitantes</div>
+          <div><span class="big">${Number(t.available || 0).toLocaleString(LOC())}</span><br>entradas locales disponibles</div>
+          <div><b>${Number(t.away_allocation || 0).toLocaleString(LOC())}</b> para aficionados visitantes</div>
           ${adm(`<button data-act="edit-ticket" data-id="${t.id}">Editar</button><button class="del" data-act="del-ticket" data-id="${t.id}">Borrar</button>`)}</div>
       </article>`;
     };
@@ -517,7 +518,7 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
 
   /* ---------- Socios ---------- */
   const isActive = (m) => !!m && new Date(m.expires_at) > new Date();
-  const fmtDate = (d) => new Date(d).toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' });
+  const fmtDate = (d) => new Date(d).toLocaleDateString(LOC(), { day: 'numeric', month: 'long', year: 'numeric' });
   const SHIRT = { none: '', camiseta: 'Camiseta oficial de regalo', firmada: 'Camiseta oficial firmada de regalo' };
   pages.socios = async () => {
     let plans;
@@ -955,6 +956,7 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
     if (e.target.closest('#burger')) { const nav = $('#nav'); const open = nav.classList.toggle('open'); $('#burger').setAttribute('aria-expanded', String(open)); }
   });
   window.addEventListener('hashchange', go);
+  if (window.I18N) I18N.onChange(() => { updateChrome(); refreshMember(); renderSocial(); render(); });
 
   /* ---------- Arranque ---------- */
   (async function init() {
