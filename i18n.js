@@ -158,6 +158,19 @@
     'Este partido ya empezó: el pronóstico está cerrado.': 'This match has already started: predictions are closed.',
     /* errores generales */
     'No se pudo cargar esta sección.': 'This section could not be loaded.', 'No se pudo cargar Supabase: revisa tu conexión.': 'Could not load Supabase: check your connection.',
+    'Tienda': 'Shop', 'Carrito': 'Cart', 'Carrito (': 'Cart (', 'Camisetas, ropa deportiva y accesorios del Worthing Mariners.': 'Shirts, sportswear and accessories from Worthing Mariners.',
+    'Tienda ficticia.': 'Fictional shop.', 'Es un juego: no se cobra nada ni se piden datos de pago. Los pedidos quedan registrados en el club.': 'It is a game: nothing is charged and no payment details are asked for. Orders are recorded by the club.',
+    'Todos': 'All', 'Camisetas': 'Shirts', 'Ropa deportiva': 'Sportswear', 'Accesorios': 'Accessories', 'Todavía no hay productos.': 'There are no products yet.',
+    'Añadir al carrito': 'Add to cart', 'Desde': 'From', 'Añadido al carrito': 'Added to cart', 'Revisa tu pedido y finalízalo.': 'Review your order and complete it.',
+    '← Seguir comprando': '← Keep shopping', 'Pedido simulado.': 'Simulated order.', 'No se cobra nada ni se pide ningún dato de pago.': 'Nothing is charged and no payment details are asked for.',
+    'Producto': 'Product', 'Precio': 'Price', 'Cant.': 'Qty', 'Subtotal': 'Subtotal', 'Quitar': 'Remove', 'Total': 'Total', 'Total:': 'Total:',
+    'Finalizar pedido': 'Place order', 'Entra para finalizar el pedido': 'Log in to place your order', 'Entra o crea una cuenta para finalizar el pedido.': 'Log in or create an account to place your order.',
+    'Tu carrito está vacío.': 'Your cart is empty.', 'Ir a la tienda': 'Go to the shop', 'Pedidos de los clientes': 'Customer orders', 'Mis pedidos': 'My orders',
+    'Aún no hay pedidos.': 'There are no orders yet.', 'Fecha': 'Date', 'Pedido': 'Order', 'Estado': 'Status', 'Entregado': 'Delivered', 'Pendiente': 'Pending',
+    '¡Pedido realizado! (simulado)': 'Order placed! (simulated)', 'Versión fan': 'Fan version', 'Versión jugador': 'Player version',
+    'Versión': 'Version', 'Talla': 'Size', 'Cantidad': 'Quantity', 'Añadir estampado (nombre y número)': 'Add printing (name and number)', 'Nombre a estampar': 'Name to print', 'Número a estampar': 'Number to print',
+    'Ej: CALLAHAN': 'E.g. CALLAHAN', 'Escribe el nombre o el número para el estampado.': 'Enter the name or number for the printing.', 'Un producto ya no está disponible.': 'A product is no longer available.',
+    'Menos': 'Less', 'Más': 'More', 'No se pudieron cargar los pedidos.': 'Orders could not be loaded.',
     'Ups': 'Oops', 'No encontrada': 'Not found'
   };
 
@@ -178,6 +191,9 @@
     [/^\+(\d+) (punto|puntos)$/, (m) => '+' + m[1] + (m[1] === '1' ? ' point' : ' points')],
     [/^Hay (\d+) partidos en juego o pendientes de resultado: los pronósticos ya están cerrados\.$/, (m) => m[1] + ' matches in play or awaiting a result: predictions are closed.'],
     [/^Hay 1 partido en juego o pendiente de resultado: los pronósticos ya están cerrados\.$/, () => '1 match in play or awaiting a result: predictions are closed.'],
+    [/^Talla (.+)$/, (m) => 'Size ' + m[1]],
+    [/^Estampado: (.*)$/, (m) => 'Printing: ' + m[1]],
+    [/^Suplemento: (.+)$/, (m, tr) => 'Surcharge: ' + m[1].split(' · ').map(x => tr(x.replace(/ \+/, ' +'))).join(' · ')],
     [/^Goles de (.+)$/, (m) => 'Goals by ' + m[1]],
     [/^Falta rellenar: (.+)\.$/, (m, tr) => 'Missing: ' + tr(m[1]) + '.'],
     [/^(\d+) h$/, (m) => m[1] + ' h']

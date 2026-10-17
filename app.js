@@ -676,6 +676,136 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
     });
   }
 
+  /* ---------- Tienda (ficticia) ---------- */
+  const SHOP_CATS = [['camisetas', 'Camisetas'], ['ropa', 'Ropa deportiva'], ['accesorios', 'Accesorios']];
+  let shopFilter = 'todas', shopProds = [];
+  const cartGet = () => { try { const c = JSON.parse(localStorage.getItem('wm_cart') || '[]'); return Array.isArray(c) ? c : []; } catch (e) { return []; } };
+  const cartSet = (c) => { try { localStorage.setItem('wm_cart', JSON.stringify(c)); } catch (e) { /* sin almacenamiento */ } updateCartBadge(); };
+  const cartCount = () => cartGet().reduce((n, l) => n + (Number(l.qty) || 0), 0);
+  function updateCartBadge() { const b = $('#cartBadge'); if (b) b.textContent = cartCount() || ''; document.querySelectorAll('[data-cart-n]').forEach(e => e.textContent = cartCount()); }
+  const variantsOf = (p) => (Array.isArray(p.variants) && p.variants.length ? p.variants : [{ name: '', price: 0, print_price: 0 }]);
+  const sizesOf = (p) => String(p.sizes || '').split(',').map(x => x.trim()).filter(Boolean);
+  const lineUnit = (p, l) => { const v = variantsOf(p).find(x => (x.name || '') === (l.variant || '')); if (!v) return null; return Number(v.price) + (l.print && Number(v.print_price) > 0 ? Number(v.print_price) : 0); };
+  const noShopMsg = (t) => pageHead(t, '') + `<div class="wrap section"><div class="empty">Esta sección aún no está activada en la base de datos.<br><small>Falta ejecutar <b>shop.sql</b> en Supabase (SQL Editor).</small></div></div>`;
+  const cartLink = () => `<a class="btn sm cart-link" href="#/carrito">Carrito (<span data-cart-n>${cartCount()}</span>)</a>`;
+
+  pages.tienda = async () => {
+    let all;
+    try { all = await DB.list('shop_products', 'sort_order', true); } catch (e) { return noShopMsg('Tienda'); }
+    shopProds = isAdmin ? all : all.filter(p => p.active);
+    const used = new Set(shopProds.map(p => p.category));
+    if (shopFilter !== 'todas' && !used.has(shopFilter)) shopFilter = 'todas';
+    const list = shopFilter === 'todas' ? shopProds : shopProds.filter(p => p.category === shopFilter);
+    const chip = (k, l) => `<a href="javascript:void 0" class="${shopFilter === k ? 'on' : ''}" data-act="shop-filter" data-id="${k}">${l}</a>`;
+    const card = (p) => {
+      const vs = variantsOf(p), min = Math.min(...vs.map(v => Number(v.price) || 0));
+      return `<article class="prod ${p.active ? '' : 'off'}">
+        <div class="prod-img">${p.image_url ? `<img src="${esc(p.image_url)}" alt="${esc(p.name)}" loading="lazy">` : `<img class="ph" src="escudo.png" alt="">`}</div>
+        <div class="prod-body"><h3>${esc(p.name)}${p.active ? '' : ' <small>(oculto)</small>'}</h3>
+          <p class="prod-desc">${esc(p.description || '')}</p>
+          <p class="prod-price">${vs.length > 1 ? 'Desde ' : ''}<b>${money(min)}</b></p>
+          <button class="btn sm" data-act="shop-add" data-id="${p.id}">Añadir al carrito</button>
+          ${adm(`<button data-act="edit-prod" data-id="${p.id}">Editar</button><button class="del" data-act="del-prod" data-id="${p.id}">Borrar</button>`)}
+        </div></article>`;
+    };
+    return pageHead('Tienda', 'Camisetas, ropa deportiva y accesorios del Worthing Mariners.', cartLink() + (isAdmin ? `<button class="adm-add" data-act="add-prod">+ Producto</button>` : '')) +
+      `<section class="section tight"><div class="wrap">
+        <div class="notice"><b>Tienda ficticia.</b> Es un juego: no se cobra nada ni se piden datos de pago. Los pedidos quedan registrados en el club.</div>
+        <div class="chips">${chip('todas', 'Todos')}${SHOP_CATS.filter(c => used.has(c[0])).map(c => chip(c[0], c[1])).join('')}</div>
+        ${list.length ? `<div class="prods">${list.map(card).join('')}</div>` : `<div class="empty">Todavía no hay productos.</div>`}
+      </div></section>`;
+  };
+
+  function addToCartForm(p) {
+    const vs = variantsOf(p), sizes = sizesOf(p), canPrint = vs.some(v => Number(v.print_price) > 0);
+    const fields = [];
+    if (vs.length > 1) fields.push({ name: 'variant', label: 'Versión', type: 'select', options: vs.map(v => [v.name || '', `${v.name} — ${money(v.price)}`]) });
+    if (sizes.length) fields.push({ name: 'size', label: 'Talla', type: 'select', options: sizes });
+    if (canPrint) {
+      fields.push({ name: 'print', label: 'Añadir estampado (nombre y número)', type: 'checkbox', hint: 'Suplemento: ' + vs.filter(v => Number(v.print_price) > 0).map(v => (v.name ? v.name + ' +' : '+') + money(v.print_price)).join(' · ') });
+      fields.push({ name: 'print_name', label: 'Nombre a estampar', placeholder: 'Ej: CALLAHAN' });
+      fields.push({ name: 'print_number', label: 'Número a estampar', type: 'number', min: 0, max: 99 });
+    }
+    fields.push({ name: 'qty', label: 'Cantidad', type: 'number', min: 1, max: 10, default: 1 });
+    openForm({ title: p.name, fields, submitLabel: 'Añadir al carrito', onSubmit: async (v) => {
+      const variant = vs.length > 1 ? v.variant : (vs[0].name || '');
+      const v0 = vs.find(x => (x.name || '') === variant) || vs[0];
+      const pr = !!v.print && Number(v0.print_price) > 0;
+      if (pr && !v.print_name && v.print_number == null) throw new Error('Escribe el nombre o el número para el estampado.');
+      const line = { product_id: p.id, variant, size: sizes.length ? v.size : '', qty: Math.max(1, Math.min(10, Number(v.qty) || 1)), print: pr, print_name: pr ? String(v.print_name || '').toUpperCase().slice(0, 14) : '', print_number: pr && v.print_number != null ? String(v.print_number).slice(0, 2) : '' };
+      const c = cartGet(), key = (l) => [l.product_id, l.variant, l.size, l.print, l.print_name, l.print_number].join('|');
+      const ex = c.find(l => key(l) === key(line));
+      if (ex) ex.qty = Math.min(10, ex.qty + line.qty); else c.push(line);
+      cartSet(c); toast('Añadido al carrito');
+    } });
+  }
+
+  function productForm(p) {
+    const vtxt = p ? variantsOf(p).map(v => `${v.name || ''} | ${v.price} | ${v.print_price || 0}`).join('\n') : '';
+    openForm({
+      title: p ? 'Editar producto' : 'Nuevo producto',
+      values: p ? { ...p, variants: vtxt } : { category: 'camisetas', active: true, sort_order: 100, variants: '' },
+      submitLabel: p ? 'Guardar' : 'Crear',
+      fields: [
+        { name: 'name', label: 'Nombre', required: true },
+        { name: 'category', label: 'Categoría', type: 'select', options: SHOP_CATS },
+        { name: 'description', label: 'Descripción', type: 'textarea', rows: 3 },
+        { name: 'image_url', label: 'Foto del producto', type: 'image', required: false },
+        { name: 'variants', label: 'Versiones y precios', type: 'textarea', rows: 4, required: true, hint: 'Una línea por versión: <b>Nombre | precio | suplemento de estampado</b>. Ej: <code>Versión fan | 40 | 5</code>. Si solo hay una versión: <code>20 | 5</code> (el estampado es opcional: pon 0 si no tiene).' },
+        { name: 'sizes', label: 'Tallas (separadas por coma)', placeholder: 'S,M,L,XL', hint: 'Déjalo vacío si no tiene tallas.' },
+        { name: 'sort_order', label: 'Orden (menor = primero)', type: 'number' },
+        { name: 'active', label: 'Visible en la tienda', type: 'checkbox' }
+      ],
+      onSubmit: async (v) => {
+        const variants = v.variants.split('\n').map(x => x.trim()).filter(Boolean).map(line => {
+          const parts = line.split('|').map(x => x.trim());
+          let name = '', price, pp = 0;
+          if (parts.length >= 3) [name, price, pp] = parts; else if (parts.length === 2) [price, pp] = parts; else price = parts[0];
+          const n = (x) => Number(String(x).replace(',', '.').replace(/[^0-9.]/g, ''));
+          if (!Number.isFinite(n(price)) || price === '' ) throw new Error('Precio inválido en la línea: ' + line);
+          return { name, price: n(price), print_price: Number.isFinite(n(pp)) ? n(pp) : 0 };
+        });
+        if (!variants.length) throw new Error('Añade al menos una versión con precio.');
+        if (variants.length > 1 && variants.some(x => !x.name)) throw new Error('Si hay varias versiones, todas necesitan nombre.');
+        const url = await resolveImage(v, 'image_url', p && p.image_url, 'tienda');
+        await DB.save('shop_products', { ...(p ? { id: p.id } : {}), name: v.name, category: v.category, description: v.description, image_url: url, variants, sizes: v.sizes, sort_order: v.sort_order == null ? 100 : v.sort_order, active: v.active });
+        toast(p ? 'Producto actualizado' : 'Producto creado'); render();
+      }
+    });
+  }
+
+  pages.carrito = async () => {
+    let prods;
+    try { prods = await DB.list('shop_products', 'sort_order', true); } catch (e) { return noShopMsg('Carrito'); }
+    const byP = Object.fromEntries(prods.map(p => [p.id, p]));
+    let cart = cartGet();
+    const valid = cart.filter(l => byP[l.product_id] && byP[l.product_id].active && lineUnit(byP[l.product_id], l) != null);
+    if (valid.length !== cart.length) { cart = valid; cartSet(cart); }
+    let total = 0;
+    const rows = cart.map((l, i) => {
+      const p = byP[l.product_id], u = lineUnit(p, l); total += u * l.qty;
+      const det = [l.variant, l.size && 'Talla ' + l.size, l.print && ('Estampado: ' + [l.print_name, l.print_number].filter(Boolean).join(' '))].filter(Boolean).join(' · ');
+      return `<tr><td><b>${esc(p.name)}</b>${det ? `<br><small>${esc(det)}</small>` : ''}</td><td>${money(u)}</td>
+        <td class="qty"><button data-act="cart-dec" data-id="${i}" aria-label="Menos">−</button> ${l.qty} <button data-act="cart-inc" data-id="${i}" aria-label="Más">+</button></td>
+        <td>${money(u * l.qty)}</td><td><button class="del" data-act="cart-del" data-id="${i}">Quitar</button></td></tr>`;
+    }).join('');
+    let orders = [], ordersErr = false;
+    if (me) { try { orders = await DB.listOrders(); } catch (e) { ordersErr = true; } }
+    const orderHtml = (o) => `<tr><td>${fmtShort(o.created_at)}${isAdmin ? `<br><small>${esc(o.customer_name || '')}</small>` : ''}</td>
+      <td>${(o.items || []).map(l => `${l.qty}× ${esc(l.name)}${l.variant ? ' (' + esc(l.variant) + ')' : ''}${l.size ? ' ' + esc(l.size) : ''}${l.print ? ' · ' + esc([l.print_name, l.print_number].filter(Boolean).join(' ')) : ''}`).join('<br>')}</td>
+      <td>${money(o.total)}</td>
+      <td>${isAdmin ? `<label class="chk"><input type="checkbox" data-act="order-done" data-id="${o.id}" ${o.status === 'entregado' ? 'checked' : ''}> Entregado</label>` : (o.status === 'entregado' ? 'Entregado' : 'Pendiente')}</td></tr>`;
+    return pageHead('Carrito', 'Revisa tu pedido y finalízalo.', `<a class="btn ghost sm" href="#/tienda">← Seguir comprando</a>`) +
+      `<section class="section tight"><div class="wrap">
+        <div class="notice"><b>Pedido simulado.</b> No se cobra nada ni se pide ningún dato de pago.</div>
+        ${cart.length ? `<div class="tbl-wrap"><table class="rank cart"><thead><tr><th>Producto</th><th>Precio</th><th>Cant.</th><th>Subtotal</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+          <p class="cart-total">Total: <b>${money(total)}</b></p>
+          <button class="btn" data-act="checkout">${me ? 'Finalizar pedido' : 'Entra para finalizar el pedido'}</button>` : `<div class="empty">Tu carrito está vacío. <a href="#/tienda">Ir a la tienda</a></div>`}
+        ${me ? `<h2 class="display" style="margin-top:40px">${isAdmin ? 'Pedidos de los clientes' : 'Mis pedidos'}</h2>
+          ${ordersErr ? `<div class="empty">No se pudieron cargar los pedidos.<br><small>Falta ejecutar <b>shop.sql</b> en Supabase.</small></div>` : orders.length ? `<div class="tbl-wrap"><table class="rank"><thead><tr><th>Fecha</th><th>Pedido</th><th>Total</th><th>Estado</th></tr></thead><tbody>${orders.map(orderHtml).join('')}</tbody></table></div>` : `<div class="empty">Aún no hay pedidos.</div>`}` : ''}
+      </div></section>`;
+  };
+
   /* ---------- Quiniela ---------- */
   const predPoints = (p, m) => (p.goals_for === m.goals_for && p.goals_against === m.goals_against) ? 3 : (Math.sign(p.goals_for - p.goals_against) === Math.sign(m.goals_for - m.goals_against) ? 1 : 0);
   pages.quiniela = async () => {
@@ -819,6 +949,20 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
     ics: wrapErr(async (id) => { const m = (await DB.list('matches', 'match_date', true)).find(x => x.id === id); if (!m) return; downloadIcs([m], 'mariners-' + m.rival.toLowerCase().replace(/[^a-z0-9]+/g, '-')); toast('Archivo de calendario descargado'); }),
     'ics-all': wrapErr(async () => { const l = (await DB.list('matches', 'match_date', true)).filter(m => !m.played); if (!l.length) return; downloadIcs(l, 'worthing-mariners-partidos'); toast('Calendario descargado: ábrelo para añadirlo'); }),
     'gal-filter': (id) => { galFilter = id; render(); },
+    'shop-filter': (id) => { shopFilter = id; render(); },
+    'shop-add': (id) => { const p = shopProds.find(x => x.id === id); if (p) addToCartForm(p); },
+    'add-prod': () => productForm(),
+    'edit-prod': wrapErr(async (id) => productForm(await byId('shop_products', 'sort_order', id))),
+    'del-prod': wrapErr(async (id) => { if (!confirmDel('este producto')) return; await DB.remove('shop_products', id); toast('Producto borrado'); render(); }),
+    'cart-inc': (i) => { const c = cartGet(); if (c[i]) { c[i].qty = Math.min(10, c[i].qty + 1); cartSet(c); render(); } },
+    'cart-dec': (i) => { const c = cartGet(); if (c[i]) { c[i].qty = Math.max(1, c[i].qty - 1); cartSet(c); render(); } },
+    'cart-del': (i) => { const c = cartGet(); c.splice(Number(i), 1); cartSet(c); render(); },
+    checkout: wrapErr(async () => {
+      if (!me) { toast('Entra o crea una cuenta para finalizar el pedido.'); openLogin(); return; }
+      const c = cartGet(); if (!c.length) return;
+      await DB.placeOrder(c); cartSet([]); toast('¡Pedido realizado! (simulado)'); render();
+    }),
+    'order-done': wrapErr(async (id, el) => { await DB.setOrderStatus(id, el && el.checked ? 'entregado' : 'pendiente'); toast('Pedido actualizado'); }),
     'open-photo': (i) => showPhoto(Number(i)),
     'lb-prev': () => showPhoto(lbIndex - 1),
     'lb-next': () => showPhoto(lbIndex + 1),
@@ -1126,7 +1270,7 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
     const el = e.target.closest('[data-act]');
     if (el) {
       const fn = actions[el.dataset.act];
-      if (fn) { if (!(el.tagName === 'INPUT' && el.type === 'checkbox')) e.preventDefault(); fn(el.dataset.id); }
+      if (fn) { if (!(el.tagName === 'INPUT' && el.type === 'checkbox')) e.preventDefault(); fn(el.dataset.id, el); }
       return;
     }
     if (e.target.closest('#burger')) { const nav = $('#nav'); const open = nav.classList.toggle('open'); $('#burger').setAttribute('aria-expanded', String(open)); }

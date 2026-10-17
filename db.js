@@ -34,6 +34,16 @@
       { id: uid(), name: 'Mariner', price: 60, discount_pct: 20, shirt: 'camiseta', perks: 'Carnet digital de socio\nPrioridad de compra de entradas\nNoticias exclusivas para socios', highlight: true, sort_order: 20, created_at: at(-300) },
       { id: uid(), name: "Captain's Club", price: 150, discount_pct: 30, shirt: 'firmada', perks: 'Carnet digital de socio\nPrioridad de compra de entradas\nGrada Main Stand reservada\nVisita al Michael Callahan Training Centre', highlight: false, sort_order: 30, created_at: at(-300) }
     ],
+    shop_products: [
+      { id: uid(), name: 'Camiseta local', category: 'camisetas', description: 'La camiseta del Worthing Mariners para jugar en Harbour Lane. Versión fan, de corte cómodo, o versión jugador, igual a la que usa el equipo.', image_url: null, variants: [{ name: "Versión fan", price: 40, print_price: 5 }, { name: "Versión jugador", price: 90, print_price: 10 }], sizes: 'XS,S,M,L,XL,XXL', active: true, sort_order: 10, created_at: at(-200) },
+      { id: uid(), name: 'Camiseta visitante', category: 'camisetas', description: 'La camiseta para los partidos fuera de casa. Versión fan o versión jugador.', image_url: null, variants: [{ name: "Versión fan", price: 40, print_price: 5 }, { name: "Versión jugador", price: 90, print_price: 10 }], sizes: 'XS,S,M,L,XL,XXL', active: true, sort_order: 20, created_at: at(-200) },
+      { id: uid(), name: 'Camiseta alternativa', category: 'camisetas', description: 'La tercera camiseta del club. Versión fan o versión jugador.', image_url: null, variants: [{ name: "Versión fan", price: 40, print_price: 5 }, { name: "Versión jugador", price: 90, print_price: 10 }], sizes: 'XS,S,M,L,XL,XXL', active: true, sort_order: 30, created_at: at(-200) },
+      { id: uid(), name: 'Short del club', category: 'ropa', description: 'Short oficial del Worthing Mariners. Puedes añadirle estampado.', image_url: null, variants: [{ name: "", price: 20, print_price: 5 }], sizes: 'S,M,L,XL', active: true, sort_order: 40, created_at: at(-200) },
+      { id: uid(), name: 'Pantalón de buzo deportivo', category: 'ropa', description: 'Pantalón de buzo para entrenar o para el día a día.', image_url: null, variants: [{ name: "", price: 35, print_price: 0 }], sizes: 'S,M,L,XL', active: true, sort_order: 50, created_at: at(-200) },
+      { id: uid(), name: 'Polerón deportivo', category: 'ropa', description: 'Polerón deportivo del club, ideal para los días de partido.', image_url: null, variants: [{ name: "", price: 50, print_price: 0 }], sizes: 'S,M,L,XL', active: true, sort_order: 60, created_at: at(-200) },
+      { id: uid(), name: 'Llavero del club', category: 'accesorios', description: 'Llavero con el escudo del Worthing Mariners.', image_url: null, variants: [{ name: "", price: 3, print_price: 0 }], sizes: '', active: true, sort_order: 70, created_at: at(-200) },
+      { id: uid(), name: 'Póster del club', category: 'accesorios', description: 'Póster oficial del Worthing Mariners.', image_url: null, variants: [{ name: "", price: 20, print_price: 0 }], sizes: '', active: true, sort_order: 80, created_at: at(-200) },
+    ],
     gallery_photos: [
       { id: uid(), image_url: 'estadio.jpg', caption: 'Harbour Lane, el hogar del Mariners', category: 'estadio', created_at: at(-3) },
       { id: uid(), image_url: 'centro-callahan.jpg', caption: 'Michael Callahan Training Centre', category: 'entrenamientos', created_at: at(-4) },
@@ -253,6 +263,37 @@
         return (p.data || []).map(x => ({ id: x.id, email: x.email, name: x.name, membership: (m.data || []).find(y => y.user_id === x.id) || null }));
       }
       return LS.get('demo_users', []).map(x => ({ id: x.id, email: x.email, name: x.name, membership: localRows('memberships').find(y => y.user_id === x.id) || null }));
+    },
+
+    /* ---------- Tienda (pedidos simulados) ---------- */
+    async placeOrder(items) {
+      if (REMOTE) { const { data, error } = await sb.rpc('place_order', { p_items: items }); if (error) throw error; return data; }
+      const u = await DB.user(); if (!u) throw new Error('Debes iniciar sesión.');
+      if (!Array.isArray(items) || !items.length) throw new Error('Carrito inválido.');
+      const prods = localRows('shop_products'); let total = 0; const lines = [];
+      for (const it of items) {
+        const pr = prods.find(x => x.id === it.product_id && x.active);
+        if (!pr) throw new Error('Un producto ya no está disponible.');
+        const v = (pr.variants || []).find(x => (x.name || '') === (it.variant || ''));
+        if (!v) throw new Error('Una versión ya no está disponible.');
+        const qty = Math.max(1, Math.min(10, Number(it.qty) || 1));
+        const pr_ = !!it.print && Number(v.print_price) > 0;
+        const unit = Number(v.price) + (pr_ ? Number(v.print_price) : 0);
+        total += unit * qty;
+        lines.push({ product_id: pr.id, name: pr.name, variant: v.name || '', size: String(it.size || '').slice(0, 10), qty, unit, print: pr_, print_name: pr_ ? String(it.print_name || '').slice(0, 14) : '', print_number: pr_ ? String(it.print_number || '').slice(0, 2) : '' });
+      }
+      const o = { id: uid(), user_id: u.id, customer_name: u.name || 'Aficionado', items: lines, total, status: 'pendiente', created_at: new Date().toISOString() };
+      LS.set('shop_orders', [...localRows('shop_orders'), o]); return o.id;
+    },
+    async listOrders() {
+      const u = await DB.user(); if (!u) return [];
+      if (REMOTE) { const { data, error } = await sb.from('shop_orders').select('*').order('created_at', { ascending: false }); if (error) throw error; return data || []; }
+      const all = localRows('shop_orders').filter(o => LS.get('admin', false) || o.user_id === u.id);
+      return all.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+    },
+    async setOrderStatus(id, status) {
+      if (REMOTE) { const { error } = await sb.from('shop_orders').update({ status }).eq('id', id); if (error) throw error; return; }
+      LS.set('shop_orders', localRows('shop_orders').map(o => o.id === id ? { ...o, status } : o));
     },
 
     /* ---------- Comentarios y reacciones ---------- */
