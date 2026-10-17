@@ -171,6 +171,13 @@
     'Versión': 'Version', 'Talla': 'Size', 'Cantidad': 'Quantity', 'Añadir estampado (nombre y número)': 'Add printing (name and number)', 'Nombre a estampar': 'Name to print', 'Número a estampar': 'Number to print',
     'Ej: CALLAHAN': 'E.g. CALLAHAN', 'Escribe el nombre o el número para el estampado.': 'Enter the name or number for the printing.', 'Un producto ya no está disponible.': 'A product is no longer available.',
     'Menos': 'Less', 'Más': 'More', 'No se pudieron cargar los pedidos.': 'Orders could not be loaded.',
+    'Ver producto': 'View product', 'Producto no encontrado': 'Product not found', '← Volver a la tienda': '← Back to the shop', 'Aún no hay fotos de este producto.': 'There are no photos of this product yet.',
+    'Guía de tallas': 'Size guide', 'Tallas tachadas: agotadas.': 'Crossed-out sizes: sold out.', 'Personalización': 'Customization', 'Añadir estampado con nombre y número': 'Add printing with name and number',
+    'Nombre (máx. 14)': 'Name (max. 14)', 'Número': 'Number', 'Comprar ahora': 'Buy now', 'Elige una talla.': 'Choose a size.', 'También te puede gustar': 'You may also like',
+    'Tienda ficticia: no se cobra nada. Envío simulado y entrega en el club.': 'Fictional shop: nothing is charged. Simulated shipping and pick-up at the club.',
+    'Pecho (cm)': 'Chest (cm)', 'Largo (cm)': 'Length (cm)', 'Cintura (cm)': 'Waist (cm)', 'Cadera (cm)': 'Hip (cm)',
+    'Medidas orientativas del cuerpo. Si estás entre dos tallas, elige la mayor.': 'Approximate body measurements. If you are between two sizes, choose the larger one.',
+    'Foto quitada': 'Photo removed', '(no disponible en esta versión)': '(not available for this version)',
     'Ups': 'Oops', 'No encontrada': 'Not found'
   };
 
@@ -191,6 +198,7 @@
     [/^\+(\d+) (punto|puntos)$/, (m) => '+' + m[1] + (m[1] === '1' ? ' point' : ' points')],
     [/^Hay (\d+) partidos en juego o pendientes de resultado: los pronósticos ya están cerrados\.$/, (m) => m[1] + ' matches in play or awaiting a result: predictions are closed.'],
     [/^Hay 1 partido en juego o pendiente de resultado: los pronósticos ya están cerrados\.$/, () => '1 match in play or awaiting a result: predictions are closed.'],
+    [/^Foto (\d+)$/, (m) => 'Photo ' + m[1]],
     [/^Talla (.+)$/, (m) => 'Size ' + m[1]],
     [/^Estampado: (.*)$/, (m) => 'Printing: ' + m[1]],
     [/^Suplemento: (.+)$/, (m, tr) => 'Surcharge: ' + m[1].split(' · ').map(x => tr(x.replace(/ \+/, ' +'))).join(' · ')],
