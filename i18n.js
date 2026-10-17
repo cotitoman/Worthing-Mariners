@@ -143,6 +143,19 @@
     'Todavía no hay comentarios. ¡Sé el primero!': 'No comments yet. Be the first!', 'Escribe algo antes de publicar.': 'Write something before posting.',
     'Espera unos segundos antes de publicar otro comentario.': 'Wait a few seconds before posting another comment.', 'Aficionado': 'Supporter',
     'Demasiados comentarios seguidos. Inténtalo más tarde.': 'Too many comments in a row. Please try again later.',
+    /* quiniela */
+    'Quiniela': 'Prediction game', 'Predice el resultado de los partidos del Mariners y sube en la clasificación de aficionados.': 'Predict the Mariners’ results and climb the fan leaderboard.',
+    'Cómo se juega:': 'How to play:',
+    'pronostica el marcador de cada partido antes de que empiece.': 'predict the score of each match before it starts.',
+    'Resultado exacto = 3 puntos': 'Exact score = 3 points', 'acertar solo quién gana (o el empate) =': 'getting only the winner (or the draw) right =', '1 punto': '1 point',
+    'Los pronósticos se cierran al comenzar el partido. Es solo por diversión: no hay premios reales.': 'Predictions close when the match kicks off. It is just for fun: there are no real prizes.',
+    'Clasificación': 'Leaderboard', 'Últimos resultados': 'Latest results', 'Aficionado': 'Supporter', 'Puntos': 'Points', 'Exactos': 'Exact', 'Aciertos': 'Correct', 'Partidos': 'Fixtures',
+    'Todavía no hay puntos. Se reparten cuando termina cada partido.': 'No points yet. They are awarded when each match ends.',
+    'Entra para poder pronosticar.': 'Log in to make predictions.', 'No hay partidos abiertos para pronosticar.': 'No matches open for predictions.',
+    'Guardar pronóstico': 'Save prediction', 'Actualizar pronóstico': 'Update prediction', 'Pronóstico guardado': 'Prediction saved',
+    'No pronosticaste este partido': 'You did not predict this match', 'Escribe goles entre 0 y 20.': 'Enter goals between 0 and 20.',
+    'para participar.': 'to take part.',
+    'Este partido ya empezó: el pronóstico está cerrado.': 'This match has already started: predictions are closed.',
     /* errores generales */
     'No se pudo cargar esta sección.': 'This section could not be loaded.', 'No se pudo cargar Supabase: revisa tu conexión.': 'Could not load Supabase: check your connection.',
     'Ups': 'Oops', 'No encontrada': 'Not found'
@@ -161,6 +174,11 @@
     [/^¡Gracias, (.+)!$/, (m) => 'Thank you, ' + m[1] + '!'],
     [/^No se pudo guardar: (.+)$/, (m, tr) => 'Could not save: ' + tr(m[1])],
     [/^No se pudo publicar: (.+)$/, (m, tr) => 'Could not post: ' + tr(m[1])],
+    [/^Tu pronóstico: (.+)$/, (m) => 'Your prediction: ' + m[1]],
+    [/^\+(\d+) (punto|puntos)$/, (m) => '+' + m[1] + (m[1] === '1' ? ' point' : ' points')],
+    [/^Hay (\d+) partidos en juego o pendientes de resultado: los pronósticos ya están cerrados\.$/, (m) => m[1] + ' matches in play or awaiting a result: predictions are closed.'],
+    [/^Hay 1 partido en juego o pendiente de resultado: los pronósticos ya están cerrados\.$/, () => '1 match in play or awaiting a result: predictions are closed.'],
+    [/^Goles de (.+)$/, (m) => 'Goals by ' + m[1]],
     [/^Falta rellenar: (.+)\.$/, (m, tr) => 'Missing: ' + tr(m[1]) + '.'],
     [/^(\d+) h$/, (m) => m[1] + ' h']
   ];

@@ -384,7 +384,7 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
   pages.partidos = async () => {
     const all = await DB.list('matches', 'match_date', true);
     const next = all.filter(m => !m.played), done = all.filter(m => m.played).reverse();
-    return pageHead('Partidos', 'Calendario, resultados y alineaciones del Mariners.', (isAdmin ? `<button class="adm-add" data-act="add-match">+ Añadir partido</button>` : '') + (next.length ? `<button class="btn sm" data-act="ics-all">📅 Descargar todos los partidos</button>` : '')) +
+    return pageHead('Partidos', 'Calendario, resultados y alineaciones del Mariners.', (isAdmin ? `<button class="adm-add" data-act="add-match">+ Añadir partido</button>` : '') + `<a class="btn sm ghost" href="#/quiniela">Quiniela</a>` + (next.length ? `<button class="btn sm" data-act="ics-all">📅 Descargar todos los partidos</button>` : '')) +
       `<section class="section tight"><div class="wrap">
         <h2 class="group-title display">Próximos partidos</h2>
         ${next.length ? `<div class="match-list">${next.map(m => matchCard(m)).join('')}</div>` : `<div class="empty">No hay partidos programados.</div>`}
@@ -675,6 +675,67 @@ Inaugurado en 2018, Harbour Lane («The Harbour») es el hogar del club: 4.850 e
       }
     });
   }
+
+  /* ---------- Quiniela ---------- */
+  const predPoints = (p, m) => (p.goals_for === m.goals_for && p.goals_against === m.goals_against) ? 3 : (Math.sign(p.goals_for - p.goals_against) === Math.sign(m.goals_for - m.goals_against) ? 1 : 0);
+  pages.quiniela = async () => {
+    let matches, preds;
+    try { [matches, preds] = await Promise.all([DB.list('matches', 'match_date', true), DB.list('predictions', 'created_at', true)]); }
+    catch (e) { return pageHead('Quiniela', '') + `<div class="wrap section"><div class="empty">Esta sección aún no está activada en la base de datos.<br><small>Falta ejecutar <b>predictions.sql</b> en Supabase (SQL Editor).</small></div></div>`; }
+    const now = Date.now(), byId = Object.fromEntries(matches.map(m => [m.id, m]));
+    const open = matches.filter(m => !m.played && new Date(m.match_date).getTime() > now);
+    const waiting = matches.filter(m => !m.played && new Date(m.match_date).getTime() <= now);
+    const played = matches.filter(m => m.played).reverse().slice(0, 6);
+    const mine = (id) => me ? preds.find(p => p.match_id === id && p.user_id === me.id) : null;
+    const teams = (m) => { const us = [MARINERS_CREST, 'Worthing Mariners'], rv = [crestImg(m.rival_crest_url, m.rival), m.rival]; return m.is_home ? [us, rv] : [rv, us]; };
+    /* clasificación */
+    const board = new Map();
+    preds.forEach(p => {
+      const m = byId[p.match_id]; if (!m || !m.played) return;
+      const r = board.get(p.user_id) || { id: p.user_id, name: p.author_name || 'Aficionado', pts: 0, exact: 0, ok: 0, n: 0 };
+      const s = predPoints(p, m); r.pts += s; r.n++; if (s === 3) r.exact++; else if (s === 1) r.ok++; r.name = p.author_name || r.name; board.set(p.user_id, r);
+    });
+    const rank = [...board.values()].sort((x, y) => y.pts - x.pts || y.exact - x.exact || x.name.localeCompare(y.name));
+    const myPos = me ? rank.findIndex(r => r.id === me.id) : -1;
+    const row = (r, i) => `<tr class="${me && r.id === me.id ? 'me' : ''}"><td>${i + 1}</td><td>${esc(r.name)}</td><td><b>${r.pts}</b></td><td>${r.exact}</td><td>${r.ok}</td><td>${r.n}</td></tr>`;
+    const table = rank.length ? `<div class="tbl-wrap"><table class="members rank"><thead><tr><th>#</th><th>Aficionado</th><th>Puntos</th><th>Exactos</th><th>Aciertos</th><th>Partidos</th></tr></thead><tbody>${rank.slice(0, 15).map(row).join('')}${myPos >= 15 ? `<tr class="gap"><td colspan="6">…</td></tr>${row(rank[myPos], myPos)}` : ''}</tbody></table></div>` : `<div class="empty">Todavía no hay puntos. Se reparten cuando termina cada partido.</div>`;
+    const openCard = (m) => {
+      const [L, R] = teams(m), p = mine(m.id), left = m.is_home ? 'goals_for' : 'goals_against', right = m.is_home ? 'goals_against' : 'goals_for';
+      return `<form class="pred" data-match="${m.id}"><div class="pred-meta"><b>${esc(m.competition || '')}</b><span>${esc(fmtLong(m.match_date))} · ${esc(fmtTime(m.match_date))}</span></div>
+        <div class="pred-row"><div class="team">${L[0]}<span>${esc(L[1])}</span></div>
+          <div class="pred-in"><input type="number" name="l" min="0" max="20" inputmode="numeric" required value="${p ? p[left] : ''}" aria-label="Goles de ${esc(L[1])}"><span>–</span><input type="number" name="r" min="0" max="20" inputmode="numeric" required value="${p ? p[right] : ''}" aria-label="Goles de ${esc(R[1])}"></div>
+          <div class="team right">${R[0]}<span>${esc(R[1])}</span></div></div>
+        <div class="pred-foot"><button class="btn sm" type="submit">${p ? 'Actualizar pronóstico' : 'Guardar pronóstico'}</button>${p ? '<span class="tag on">Pronóstico guardado</span>' : ''}<span class="form-err" role="alert"></span></div></form>`;
+    };
+    const playedRow = (m) => {
+      const [L, R] = teams(m), p = mine(m.id), s = p ? predPoints(p, m) : null;
+      const score = m.is_home ? `${m.goals_for} – ${m.goals_against}` : `${m.goals_against} – ${m.goals_for}`;
+      const pick = p ? (m.is_home ? `${p.goals_for} – ${p.goals_against}` : `${p.goals_against} – ${p.goals_for}`) : '';
+      return `<div class="pred done"><div class="pred-row"><div class="team">${L[0]}<span>${esc(L[1])}</span></div><div class="pred-final">${score}<small>FINAL</small></div><div class="team right">${R[0]}<span>${esc(R[1])}</span></div></div>
+        <div class="pred-foot">${p ? `<span>Tu pronóstico: <b>${pick}</b></span><span class="tag ${s === 3 ? 'win' : s === 1 ? 'draw' : 'loss'}">+${s} ${s === 1 ? 'punto' : 'puntos'}</span>` : (me ? '<span class="muted">No pronosticaste este partido</span>' : '')}</div></div>`;
+    };
+    const intro = `<div class="notice"><b>Cómo se juega:</b> pronostica el marcador de cada partido antes de que empiece. <b>Resultado exacto = 3 puntos</b>; acertar solo quién gana (o el empate) = <b>1 punto</b>. Los pronósticos se cierran al comenzar el partido. Es solo por diversión: no hay premios reales.</div>`;
+    const login = me ? '' : `<div class="notice"><button class="linkbtn" data-act="login">Entra</button> o <button class="linkbtn" data-act="signup">crea una cuenta</button> para participar.</div>`;
+    return pageHead('Quiniela', 'Predice el resultado de los partidos del Mariners y sube en la clasificación de aficionados.', '') +
+      `<section class="section tight"><div class="wrap">${intro}${login}
+        <h2 class="group-title display">Próximos partidos</h2>
+        ${open.length ? (me ? open.map(openCard).join('') : `<div class="empty">Entra para poder pronosticar.</div>`) : '<div class="empty">No hay partidos abiertos para pronosticar.</div>'}
+        ${waiting.length ? `<p class="zone-note">${waiting.length === 1 ? 'Hay 1 partido en juego o pendiente de resultado' : 'Hay ' + waiting.length + ' partidos en juego o pendientes de resultado'}: los pronósticos ya están cerrados.</p>` : ''}
+        <h2 class="group-title display">Clasificación</h2>${table}
+        ${played.length ? `<h2 class="group-title display">Últimos resultados</h2>${played.map(playedRow).join('')}` : ''}
+      </div></section>`;
+  };
+  document.addEventListener('submit', async (e) => {
+    const form = e.target.closest('form.pred'); if (!form) return;
+    e.preventDefault();
+    const err = $('.form-err', form), btn = $('button[type=submit]', form);
+    const L = Number(form.elements.l.value), R = Number(form.elements.r.value);
+    if (!Number.isInteger(L) || !Number.isInteger(R) || L < 0 || R < 0 || L > 20 || R > 20) { err.textContent = 'Escribe goles entre 0 y 20.'; return; }
+    const m = (await DB.list('matches', 'match_date', true)).find(x => x.id === form.dataset.match); if (!m) return;
+    btn.disabled = true; err.textContent = '';
+    try { await DB.savePrediction(m.id, m.is_home ? L : R, m.is_home ? R : L); toast('Pronóstico guardado'); render(); }
+    catch (ex) { console.error(ex); err.textContent = ex.message || String(ex); btn.disabled = false; }
+  });
 
   pages.contacto = async () => {
     const info = { ...DEFAULT_CONTACT, ...(await DB.getContent('contact', DEFAULT_CONTACT).catch(() => DEFAULT_CONTACT)) };

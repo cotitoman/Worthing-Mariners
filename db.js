@@ -284,6 +284,22 @@
       LS.set('news_reactions', rows);
     },
 
+    /* ---------- Quiniela ---------- */
+    async savePrediction(matchId, gf, ga) {
+      if (REMOTE) {
+        const { error } = await sb.from('predictions').upsert({ match_id: matchId, goals_for: gf, goals_against: ga }, { onConflict: 'match_id,user_id' });
+        if (error) throw new Error(/ya empez/i.test(error.message) ? 'Este partido ya empezó: el pronóstico está cerrado.' : error.message);
+        return;
+      }
+      const u = await DB.user(); if (!u) throw new Error('Debes iniciar sesión.');
+      const m = localRows('matches').find(x => x.id === matchId);
+      if (!m || m.played || new Date(m.match_date) <= new Date()) throw new Error('Este partido ya empezó: el pronóstico está cerrado.');
+      const rows = localRows('predictions'), i = rows.findIndex(r => r.match_id === matchId && r.user_id === u.id);
+      if (i >= 0) rows[i] = { ...rows[i], goals_for: gf, goals_against: ga };
+      else rows.push({ id: uid(), match_id: matchId, user_id: u.id, author_name: u.name || 'Aficionado', goals_for: gf, goals_against: ga, created_at: new Date().toISOString() });
+      LS.set('predictions', rows);
+    },
+
     onAuth(cb) {
       listeners.push(cb);
       if (REMOTE) sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_IN' || ev === 'SIGNED_OUT') cb(); });
